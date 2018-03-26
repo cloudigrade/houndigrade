@@ -32,15 +32,6 @@ Get into the houndigrade project code:
     git clone git@github.com:cloudigrade/houndigrade.git
     cd houndigrade
 
-Need to run houndigrade? Use docker-compose!
-
-    make start-compose
-
-This will also mount the `./houndigrade` folder inside the container, so you can
-continue working on code and it will auto-reload in the container. AWS Access
-within Docker is handled via environment variables. See the AWS account setup
-section for details.
-
 ## Python virtual environment setup
 
 All of houndigrade's dependencies should be stored in a virtual environment.
@@ -50,7 +41,7 @@ to use another technology, that's your prerogative!
 
 To create a virtualenv and install the project dependencies run:
 
-    pipenv install
+    pipenv install --dev
 
 If you need to add a dependancy to the project use:
 
@@ -65,11 +56,27 @@ Finally, if you need to install a dev only dependency, use:
 
 ### Running
 
+To run houndigrade locally use docker-compose
+
+    docker-compose up
+
+This will start the queue, the houndigrade container, mount provided block 
+devices inside said container, and run a scan against it, placing the results
+ on the queue. The queue can be accessed at [localhost:15672](http://localhost:15672) with `guest/guest` being the default credentials.
+
 ### Testing
 
 To run all local tests as well as our code-quality checking commands:
 
     tox
+    
+To run just our code-quality checking commands:
+
+    tox -e flake8
+    
+To run just our tests:
+
+    tox -e py36
 
 If you wish to run a higher-level suite of integration tests, see
 [integrade](https://github.com/cloudigrade/integrade).
