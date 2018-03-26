@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  app:
+    build: .
+    entrypoint: ./entrypoint.sh
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@queue:5672/%2F
+      - RABBITMQ_EXCHANGE_NAME=houndigrade_inspectigrade
+      - RABBITMQ_QUEUE_NAME=inspection_results
+    volumes:
+      - ./docker/dev-entrypoint.sh:/opt/houndigrade/entrypoint.sh
+      - ./docker/rh_disk:/dev/rh_disk
+      - ./docker/nrh_disk:/dev/nrh_disk
+      - /dev:/dev
+    depends_on:
+      - queue
+    privileged: true
+  queue:
+    image: rabbitmq:management-alpine
+    hostname: cloudiqueue
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DISK_FREE_LIMIT={mem_relative, 1.5}
+    volumes:
+      - ./rabbitmq:/var/lib/rabbitmq
