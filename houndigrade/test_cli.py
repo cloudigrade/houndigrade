@@ -1,7 +1,9 @@
 """Collection of tests for ``cli`` module."""
 import pathlib
+from textwrap import dedent
 from unittest import TestCase
 from unittest.mock import call, patch
+from gettext import gettext as _
 
 from subprocess import CalledProcessError
 from click.testing import CliRunner
@@ -48,8 +50,10 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             self.prep_fs(drive_path)
 
-            result = runner.invoke(main,
-                                   ['-c', cloud, '--debug', '-t', image_id, drive_path])
+            result = runner.invoke(
+                main,
+                ['-c', cloud, '--debug', '-t', image_id, drive_path]
+            )
 
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(mock_subprocess_run.call_count, 4)
@@ -112,7 +116,7 @@ class TestCLI(TestCase):
 
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertIn(' No such file or directory', result.output)
+        self.assertIn('No such file or directory', result.output)
 
     @patch('cli.Connection')
     @patch('cli.glob.glob')
@@ -148,9 +152,13 @@ class TestCLI(TestCase):
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
-            '"status": "No release files found on ./dev/xvdf1"', result.output)
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf1'))),
+            result.output)
         self.assertIn(
-            '"status": "No release files found on ./dev/xvdf2"', result.output)
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf2'))),
+            result.output)
 
     @patch('cli.Connection')
     @patch('cli.glob.glob')
@@ -183,8 +191,8 @@ class TestCLI(TestCase):
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
         self.assertEqual('Mount failed.',
-                      mock_con.mock_calls[3][1][0]['facts']['./dev/xvdf'][
-                          './dev/xvdf1'][0]['error'])
+                         mock_con.mock_calls[3][1][0]['facts']['./dev/xvdf'][
+                             './dev/xvdf1'][0]['error'])
 
     @staticmethod
     def prep_fs(drive_path):
@@ -193,32 +201,56 @@ class TestCLI(TestCase):
         pathlib.Path('{}/xvdf2/etc'.format(drive_path)).mkdir(parents=True,
                                                               exist_ok=True)
 
+        redhat_release = 'Red Hat Enterprise Linux Server release 7.4 (' \
+                         'Maipo)\n'
+        centos_release = 'CentOS Linux release 7.4.1708 (Core)\n'
+
+        rh_os_release = """\
+            NAME="Red Hat Enterprise Linux Server"
+            VERSION="7.4 (Maipo)"
+            ID="rhel"
+            ID_LIKE="fedora"
+            VARIANT="Server"
+            VARIANT_ID="server"
+            VERSION_ID="7.4"
+            PRETTY_NAME="Red Hat Enterprise Linux Server 7.4 (Maipo)"
+            ANSI_COLOR="0;31"
+            CPE_NAME="cpe:/o:redhat:enterprise_linux:7.4:GA:server"
+            HOME_URL="https://www.redhat.com/"
+            BUG_REPORT_URL="https://bugzilla.redhat.com/"
+
+            REDHAT_BUGZILLA_PRODUCT="Red Hat Enterprise Linux 7"
+            REDHAT_BUGZILLA_PRODUCT_VERSION=7.4
+            REDHAT_SUPPORT_PRODUCT="Red Hat Enterprise Linux"
+            REDHAT_SUPPORT_PRODUCT_VERSION="7.4"
+
+            """
+
+        centos_os_release = """\
+            NAME="CentOS Linux"
+            VERSION="7 (Core)"
+            ID="centos"
+            ID_LIKE="rhel fedora"
+            VERSION_ID="7"
+            PRETTY_NAME="CentOS Linux 7 (Core)"
+            ANSI_COLOR="0;31"
+            CPE_NAME="cpe:/o:centos:centos:7"
+            HOME_URL="https://www.centos.org/"
+            BUG_REPORT_URL="https://bugs.centos.org/"
+
+            CENTOS_MANTISBT_PROJECT="CentOS-7"
+            CENTOS_MANTISBT_PROJECT_VERSION="7"
+            REDHAT_SUPPORT_PRODUCT="centos"
+            REDHAT_SUPPORT_PRODUCT_VERSION="7"
+
+            """
+
         with open('{}/xvdf1/etc/redhat-release'.format(drive_path), 'w') as f:
-            f.write('Red Hat Enterprise Linux Server release 7.4 (Maipo)\n')
+            f.write(redhat_release)
         with open('{}/xvdf1/etc/os-release'.format(drive_path), 'w') as f:
-            f.write('NAME=\"Red Hat Enterprise Linux Server\"\nVERSION=\"7.4 '
-                    '(Maipo)\"\nID=\"rhel\"\nID_LIKE=\"fedora\"\nVARIANT'
-                    '=\"Server\"\nVARIANT_ID=\"server\"\nVERSION_ID=\"7.4'
-                    '\"\nPRETTY_NAME=\"Red Hat Enterprise Linux Server 7.4 ('
-                    'Maipo)\"\nANSI_COLOR=\"0;31\"\nCPE_NAME=\"cpe:/o:redhat'
-                    ':enterprise_linux:7.4:GA:server\"\nHOME_URL=\"https'
-                    '://www.redhat.com/\"\nBUG_REPORT_URL=\"https://bugzilla'
-                    '.redhat.com/\"\n\nREDHAT_BUGZILLA_PRODUCT=\"Red Hat '
-                    'Enterprise Linux '
-                    '7\"\nREDHAT_BUGZILLA_PRODUCT_VERSION=7.4'
-                    '\nREDHAT_SUPPORT_PRODUCT=\"Red Hat Enterprise '
-                    'Linux\"\nREDHAT_SUPPORT_PRODUCT_VERSION=\"7.4\"\n')
+            f.write(dedent(rh_os_release))
 
         with open('{}/xvdf2/etc/centos-release'.format(drive_path), 'w') as f:
-            f.write('CentOS Linux release 7.4.1708 (Core) \n')
+            f.write(centos_release)
         with open('{}/xvdf2/etc/os-release'.format(drive_path), 'w') as f:
-            f.write('NAME=\"CentOS Linux\"\nVERSION=\"7 ('
-                    'Core)\"\nID=\"centos\"\nID_LIKE=\"rhel '
-                    'fedora\"\nVERSION_ID=\"7\"\nPRETTY_NAME=\"CentOS Linux '
-                    '7 (Core)\"\nANSI_COLOR=\"0;31\"\nCPE_NAME=\"cpe:/o'
-                    ':centos:centos:7\"\nHOME_URL=\"https://www.centos.org'
-                    '/\"\nBUG_REPORT_URL=\"https://bugs.centos.org/\"\n'
-                    '\nCENTOS_MANTISBT_PROJECT=\"CentOS-7'
-                    '\"\nCENTOS_MANTISBT_PROJECT_VERSION=\"7'
-                    '\"\nREDHAT_SUPPORT_PRODUCT=\"centos'
-                    '\"\nREDHAT_SUPPORT_PRODUCT_VERSION=\"7\"\n\n')
+            f.write(dedent(centos_os_release))
