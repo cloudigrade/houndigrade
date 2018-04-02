@@ -17,5 +17,5 @@ RUN scl enable rh-python36 'pip install pipenv \
 WORKDIR /opt/houndigrade
 COPY houndigrade/cli.py .
 
-ENTRYPOINT ["scl", "enable", "rh-python36", "python", "cli.py"]
+ENTRYPOINT ["scl", "enable", "rh-python36", "--", "python", "cli.py"]
 CMD ["--help"]

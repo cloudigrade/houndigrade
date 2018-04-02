@@ -3,6 +3,7 @@ import glob
 import json
 import os
 import subprocess
+from contextlib import contextmanager
 from gettext import gettext as _
 
 import click
@@ -15,7 +16,7 @@ INSPECT_PATH = '/mnt/inspect'
 @click.option('--cloud',
               '-c',
               default='aws',
-              help='Cloud in which we are performing the inspection.',
+              help=_('Cloud in which we are performing the inspection.'),
               type=click.Choice(['aws', 'gcp', 'azure']))
 @click.option('--target',
               '-t',
@@ -29,7 +30,7 @@ INSPECT_PATH = '/mnt/inspect'
               is_flag=True,
               help=_('Print debug output.'))
 def main(cloud, target, debug):
-    r"""
+    """
     Mounts provided volumes and inspects them.
 
     The script takes provided target information and checks if there are any
@@ -37,16 +38,9 @@ def main(cloud, target, debug):
     and inspecting it. As it loops through it builds a dictionary of results
     that gets placed on a queue once the processing is done.
 
-    \b
-    Args:
-        cloud (str): Cloud in which we are performing the inspection.
-        target (str): Inspection target, the cloud specific image identifier
-                      and path to the attached drive on the machine.
-        debug (boolean): Boolean flag that turns on debug output.
-
     """
-    click.echo(_('Provided cloud: {}'.format(cloud)))
-    click.echo(_('Provided drive(s) to inspect: {}'.format(target)))
+    click.echo(_('Provided cloud: {}').format(cloud))
+    click.echo(_('Provided drive(s) to inspect: {}').format(target))
 
     results = {
         'cloud': cloud,
@@ -55,48 +49,73 @@ def main(cloud, target, debug):
     }
 
     for image_id, drive in target:
-        click.echo('Checking drive {}'.format(drive))
-
-        results['facts'][drive] = {'image_id': image_id}
-        for partition in get_partitions(drive):
-            click.echo('Checking partition {}'.format(partition))
-
-            results['facts'][drive][partition] = []
-            try:
-                subprocess.run([
-                    'mount',
-                    '-t',
-                    'auto',
-                    '{}'.format(partition),
-                    '{}'.format(INSPECT_PATH)
-                ],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    universal_newlines=True
-                )
-            except subprocess.CalledProcessError as e:
-                click.echo(
-                    _('Mount of {} failed '
-                      'with error: {}'.format(partition, e.stderr)),
-                    err=True
-                )
-
-                results['facts'][drive][partition].append({
-                    'error': e.stderr
-                })
-
-                continue
-
-            check_release_files(partition, results['facts'][drive][partition])
-
-            click.echo('Unmounting partition: {}'.format(partition))
-            subprocess.run(['umount', '{}'.format(INSPECT_PATH)])
+        mount_and_inspect(drive, image_id, results)
 
     if debug:
         click.echo(json.dumps(results))
 
     report_results(results)
+
+
+def mount_and_inspect(drive, image_id, results):
+    """
+    Mount provided drive and inspect it.
+
+    Args:
+        drive (str): The path to the drive to mount.
+        image_id (str): The id of the image we're inspecting.
+        results (dict): The results of the inspection.
+
+    """
+    click.echo(_('Checking drive {}').format(drive))
+    results['facts'][drive] = {'image_id': image_id}
+    for partition in get_partitions(drive):
+        click.echo(_('Checking partition {}').format(partition))
+
+        results['facts'][drive][partition] = []
+        try:
+            with mount(partition, INSPECT_PATH):
+                check_release_files(
+                    partition,
+                    results['facts'][drive][partition]
+                )
+
+        except subprocess.CalledProcessError as e:
+            click.echo(
+                _('Mount of {} failed with error: {}').format(
+                    partition, e.stderr),
+                err=True
+            )
+
+            results['facts'][drive][partition].append({
+                'error': e.stderr
+            })
+
+
+@contextmanager
+def mount(partition, inspect_path):
+    """
+    Mount given partition.
+
+    Args:
+        partition (str):  The path to the partition to mount.
+        inspect_path (str): The path where the partition should be mounted.
+
+    """
+    mount_result = subprocess.run([
+        'mount',
+        '-t',
+        'auto',
+        '{}'.format(partition),
+        '{}'.format(inspect_path)
+    ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+    yield mount_result
+    subprocess.run(['umount', '{}'.format(inspect_path)])
 
 
 def report_results(results):
@@ -135,24 +154,24 @@ def check_release_files(partition, results):
     release_file_paths = find_release_files()
 
     if not release_file_paths:
-        click.echo('No release files found on {}'.format(partition))
+        click.echo(_('No release files found on {}').format(partition))
         results.append({
             'rhel_found': False,
-            'status': 'No release files found on {}'.format(partition)
+            'status': _('No release files found on {}').format(partition)
         })
     else:
         for release_file_path in release_file_paths:
-            rhel_found, file = check_file(release_file_path)
+            rhel_found, contents = check_file(release_file_path)
 
             if rhel_found:
-                click.echo('RHEL found on: {}'.format(partition))
+                click.echo(_('RHEL found on: {}').format(partition))
             else:
-                click.echo('RHEL not found on: {}'.format(partition))
+                click.echo(_('RHEL not found on: {}').format(partition))
 
             results.append({
                 'rhel_found': rhel_found,
                 'release_file': release_file_path,
-                'release_file_contents': file
+                'release_file_contents': contents
             })
 
 
@@ -188,16 +207,17 @@ def check_file(file_path):
 
     Returns:
         boolean: Whether we think this file is from RHEL.
-        file (str): The contents of the release file to support our decision.
+        file_contents (str): The contents of the release file to
+        support our decision.
 
     """
     try:
         with open(file_path) as f:
-            file = f.read()
-            if 'Red Hat' in file:
-                return True, file
+            file_contents = f.read()
+            if 'Red Hat' in file_contents:
+                return True, file_contents
             else:
-                return False, file
+                return False, file_contents
     except FileNotFoundError as e:
         click.echo('{}'.format(e))
         return False, None
