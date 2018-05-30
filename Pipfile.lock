@@ -18,10 +18,10 @@
     "default": {
         "amqp": {
             "hashes": [
-                "sha256:790e5366272a5b301fb969bd0d22b0adfee19f80cebf6e2dcef39c3b2236dedc",
-                "sha256:408b131bf8d0e19d3926a6682dc0ed6dc561aade5e0a173162c76657e1b68e72"
+                "sha256:eed41946890cd43e8dee44a316b85cf6fee5a1a34bb4a562b660a358eb529e1b",
+                "sha256:073dd02fdd73041bffc913b767866015147b61f2a9bc104daef172fc1a0066eb"
             ],
-            "version": "==2.3.1"
+            "version": "==2.3.2"
         },
         "click": {
             "hashes": [
