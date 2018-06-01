@@ -12,6 +12,7 @@ services:
       - ./docker/dev-entrypoint.sh:/opt/houndigrade/entrypoint.sh
       - ./docker/rh_disk:/dev/rh_disk
       - ./docker/nrh_disk:/dev/nrh_disk
+      - ./docker/both_disk:/dev/both_disk
       - /dev:/dev
     depends_on:
       - queue
