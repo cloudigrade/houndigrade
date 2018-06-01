@@ -44,8 +44,7 @@ def main(cloud, target, debug):
 
     results = {
         'cloud': cloud,
-        'inspection_targets': target,
-        'facts': {},
+        'results': {},
     }
 
     for image_id, drive in target:
@@ -68,16 +67,17 @@ def mount_and_inspect(drive, image_id, results):
 
     """
     click.echo(_('Checking drive {}').format(drive))
-    results['facts'][drive] = {'image_id': image_id}
+    results['results'][image_id] = results['results'].get(image_id, {})
+    results['results'][image_id][drive] = {}
     for partition in get_partitions(drive):
         click.echo(_('Checking partition {}').format(partition))
 
-        results['facts'][drive][partition] = []
+        results['results'][image_id][drive][partition] = {}
         try:
             with mount(partition, INSPECT_PATH):
                 check_release_files(
                     partition,
-                    results['facts'][drive][partition]
+                    results['results'][image_id][drive][partition]
                 )
 
         except subprocess.CalledProcessError as e:
@@ -86,10 +86,7 @@ def mount_and_inspect(drive, image_id, results):
                     partition, e.stderr),
                 err=True
             )
-
-            results['facts'][drive][partition].append({
-                'error': e.stderr
-            })
+            results['results'][image_id][drive][partition]['error'] = e.stderr
 
 
 @contextmanager
@@ -147,7 +144,7 @@ def check_release_files(partition, results):
 
     Args:
         partition (str): The partition we are currently checking.
-        results (list): Part of the results dict to which we should be
+        results (dict): Part of the results dict to which we should be
         writing our results.
 
     """
@@ -155,10 +152,8 @@ def check_release_files(partition, results):
 
     if not release_file_paths:
         click.echo(_('No release files found on {}').format(partition))
-        results.append({
-            'rhel_found': False,
-            'status': _('No release files found on {}').format(partition)
-        })
+        results['rhel_found'] = False
+        results['status'] = _('No release files found on {}').format(partition)
     else:
         for release_file_path in release_file_paths:
             rhel_found, contents = check_file(release_file_path)
@@ -168,11 +163,15 @@ def check_release_files(partition, results):
             else:
                 click.echo(_('RHEL not found on: {}').format(partition))
 
-            results.append({
-                'rhel_found': rhel_found,
-                'release_file': release_file_path,
-                'release_file_contents': contents
-            })
+            evidence = results.get('evidence', [])
+            new_evidence = \
+                {'release_file': release_file_path,
+                 'release_file_contents': contents,
+                 'rhel_found': rhel_found}
+            evidence.append(new_evidence)
+            results['rhel_found'] = \
+                rhel_found or results.get('rhel_found', False)
+            results['evidence'] = evidence
 
 
 def find_release_files():
