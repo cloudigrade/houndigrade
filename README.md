@@ -56,11 +56,29 @@ Finally, if you need to install a dev only dependency, use:
 
 ### Running
 
+Before running, you must have the following environment variables set so houndigrade can talk to Amazon SQS to share its results:
+
+    - `QUEUE_CONNECTION_URL`
+    - `AWS_SQS_QUEUE_NAME_PREFIX`
+
+`AWS_SQS_QUEUE_NAME_PREFIX` should match what you use when running cloudigrade, and that is probably `${USER}-`.
+
+`QUEUE_CONNECTION_URL` must be a well-formed SQS URL that includes your Amazon SQS access key and secret key. Many Amazon keys have URL-unfriendly characters. You may want to use a small helper script like this to generate a valid URL:
+
+```python
+from os import environ
+from urllib.parse import quote
+print('sqs://{}:{}@'.format(
+    quote(environ['AWS_SQS_ACCESS_KEY_ID'], safe=''),
+    quote(environ['AWS_SQS_SECRET_ACCESS_KEY'], safe='')
+))
+```
+
 To run houndigrade locally use docker-compose
 
     docker-compose up
 
-This will start the queue, the houndigrade container, mount provided block 
+This will start the houndigrade container, mount provided block
 devices inside said container, and run a scan against it, placing the results
  on the queue. The queue can be accessed at [localhost:15672](http://localhost:15672) with `guest/guest` being the default credentials.
 
@@ -69,11 +87,11 @@ devices inside said container, and run a scan against it, placing the results
 To run all local tests as well as our code-quality checking commands:
 
     tox
-    
+
 To run just our code-quality checking commands:
 
     tox -e flake8
-    
+
 To run just our tests:
 
     tox -e py36

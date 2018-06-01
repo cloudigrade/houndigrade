@@ -123,12 +123,12 @@ def report_results(results):
         results (dict): The results of the finished inspection.
 
     """
-    queue_name = os.getenv('RABBITMQ_QUEUE_NAME')
+    queue_name = os.getenv('RESULTS_QUEUE_NAME')
 
-    exchange = Exchange(os.getenv('RABBITMQ_EXCHANGE_NAME'), durable=True)
+    exchange = Exchange(os.getenv('EXCHANGE_NAME'), durable=True)
     queue = Queue(queue_name, exchange=exchange, routing_key=queue_name)
 
-    with Connection(os.getenv('RABBITMQ_URL')) as conn:
+    with Connection(os.getenv('QUEUE_CONNECTION_URL')) as conn:
         producer = conn.Producer(serializer='json')
         producer.publish(
             results,
