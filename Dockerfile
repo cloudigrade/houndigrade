@@ -6,11 +6,11 @@ RUN mkdir -p /mnt/inspect
 
 RUN yum install centos-release-scl -y \
     && yum-config-manager --enable centos-sclo-rh-testing \
-    && yum install which rh-python36 rh-python36-python-pip -y
+    && yum install which rh-python36 rh-python36-python-pip libcurl-devel gcc -y
 
 COPY Pipfile .
 COPY Pipfile.lock .
-RUN scl enable rh-python36 'pip install pipenv \
+RUN PYCURL_SSL_LIBRARY=nss scl enable rh-python36 'pip install pipenv \
     && pipenv install --system \
     && rm -rf Pipfile*'
 
