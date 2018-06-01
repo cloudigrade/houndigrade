@@ -69,6 +69,10 @@ class TestCLI(TestCase):
 
         self.assertEqual(result.exit_code, 0)
         self.assertIn('"cloud": "aws"', result.output)
+        self.assertIn('"ami-123456789"', result.output)
+        self.assertIn('RHEL found on: ./dev/xvdf1', result.output)
+        self.assertIn('"./dev/xvdf1": {"rhel_found": true', result.output)
+        self.assertIn('RHEL not found on: ./dev/xvdf2', result.output)
 
         self.assertEqual(len(mock_with_conn.method_calls), 1)
         self.assertEqual(mock_with_conn.method_calls[0],
