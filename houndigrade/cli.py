@@ -1,4 +1,5 @@
 """Command line script for inspecting attached volumes."""
+import base64
 import glob
 import json
 import os
@@ -6,8 +7,10 @@ import subprocess
 from contextlib import contextmanager
 from gettext import gettext as _
 
+import boto3
 import click
-from kombu import Connection, Exchange, Queue
+import jsonpickle
+from botocore.exceptions import ClientError
 
 INSPECT_PATH = '/mnt/inspect'
 
@@ -115,6 +118,32 @@ def mount(partition, inspect_path):
     subprocess.run(['umount', '{}'.format(inspect_path)])
 
 
+def _get_sqs_queue_url(queue_name):
+    """
+    Get the SQS queue URL for the given queue name.
+
+    This has the side-effect on ensuring that the queue exists.
+
+    Note: This function was copied verbatim from `cloudigrade`.
+
+    FIXME: Move this function to a shared library.
+
+    Args:
+        queue_name (str): the name of the target SQS queue
+
+    Returns:
+        str: the queue's URL.
+
+    """
+    sqs = boto3.client('sqs')
+    try:
+        return sqs.get_queue_url(QueueName=queue_name)['QueueUrl']
+    except ClientError as e:
+        if e.response['Error']['Code'].endswith('.NonExistentQueue'):
+            return sqs.create_queue(QueueName=queue_name)['QueueUrl']
+        raise
+
+
 def report_results(results):
     """
     Places the results on a queue.
@@ -123,19 +152,18 @@ def report_results(results):
         results (dict): The results of the finished inspection.
 
     """
+    message_body = base64.b64encode(
+        jsonpickle.encode(results).encode('utf-8')
+    ).decode('utf-8')
+
     queue_name = os.getenv('RESULTS_QUEUE_NAME')
+    queue_url = _get_sqs_queue_url(queue_name)
 
-    exchange = Exchange(os.getenv('EXCHANGE_NAME'), durable=True)
-    queue = Queue(queue_name, exchange=exchange, routing_key=queue_name)
-
-    with Connection(os.getenv('QUEUE_CONNECTION_URL')) as conn:
-        producer = conn.Producer(serializer='json')
-        producer.publish(
-            results,
-            exchange=exchange,
-            routing_key=queue_name,
-            declare=[queue]
-        )
+    sqs = boto3.client('sqs')
+    sqs.send_message(
+        QueueUrl=queue_url,
+        MessageBody=message_body,
+    )
 
 
 def check_release_files(partition, results):

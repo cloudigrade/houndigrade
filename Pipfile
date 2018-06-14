@@ -5,9 +5,8 @@ name = "pypi"
 
 [packages]
 click = "*"
-kombu = "*"
 "boto3" = "*"
-pycurl = "*"
+jsonpickle = "*"
 
 [dev-packages]
 nose = "*"
