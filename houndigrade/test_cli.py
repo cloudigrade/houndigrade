@@ -2,13 +2,14 @@
 import pathlib
 from textwrap import dedent
 from unittest import TestCase
-from unittest.mock import call, patch
+from unittest.mock import call, patch, Mock
 from gettext import gettext as _
 
+from botocore.exceptions import ClientError
 from subprocess import CalledProcessError
 from click.testing import CliRunner
 
-from cli import main
+from cli import _get_sqs_queue_url, main
 
 
 class TestCLI(TestCase):
@@ -20,11 +21,11 @@ class TestCLI(TestCase):
         self.assertIn(
             'Error: Missing option "--target" / "-t".', result.output)
 
-    @patch('cli.Connection')
+    @patch('cli.report_results')
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     def test_cli_happy_path(self, mock_subprocess_run, mock_glob_glob,
-                            mock_connection):
+                            mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
@@ -39,11 +40,6 @@ class TestCLI(TestCase):
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-
-        mock_with_conn = mock_connection.return_value.__enter__.return_value
-        mock_producer = mock_with_conn.Producer.return_value
-        mock_pub = mock_producer.publish
-        mock_pub.return_value = True
 
         runner = CliRunner()
 
@@ -76,17 +72,17 @@ class TestCLI(TestCase):
         self.assertIn('RHEL found on: ./dev/xvdf2', result.output)
         self.assertIn('"./dev/xvdf2": {"rhel_found": true', result.output)
 
-        self.assertEqual(len(mock_with_conn.method_calls), 1)
-        self.assertEqual(mock_with_conn.method_calls[0],
-                         call.Producer(serializer='json'))
-        self.assertEqual(len(mock_producer.method_calls), 1)
-        self.assertTrue(mock_pub.called)
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('results', results)
+        self.assertIn(image_id, results['results'])
 
-    @patch('cli.Connection')
+    @patch('cli.report_results')
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     def test_cli_disappearing_files(self, mock_subprocess_run, mock_glob_glob,
-                                    mock_connection):
+                                    mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
@@ -102,11 +98,6 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
 
-        mock_with_conn = mock_connection.__enter__.return_value
-        mock_producer = mock_with_conn.Producer.return_value
-        mock_pub = mock_producer.publish
-        mock_pub.return_value = True
-
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -120,11 +111,17 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn('No such file or directory', result.output)
 
-    @patch('cli.Connection')
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('results', results)
+        self.assertIn(image_id, results['results'])
+
+    @patch('cli.report_results')
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     def test_cli_no_version_files(self, mock_subprocess_run, mock_glob_glob,
-                                  mock_connection):
+                                  mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
@@ -136,11 +133,6 @@ class TestCLI(TestCase):
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-
-        mock_with_conn = mock_connection.__enter__.return_value
-        mock_producer = mock_with_conn.Producer.return_value
-        mock_pub = mock_producer.publish
-        mock_pub.return_value = True
 
         runner = CliRunner()
 
@@ -162,10 +154,17 @@ class TestCLI(TestCase):
                 _('No release files found on {}'.format('./dev/xvdf2'))),
             result.output)
 
-    @patch('cli.Connection')
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('results', results)
+        self.assertIn(image_id, results['results'])
+
+    @patch('cli.report_results')
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
-    def test_failed_mount(self, mock_subprocess_run, mock_glob_glob, mock_con):
+    def test_failed_mount(self, mock_subprocess_run, mock_glob_glob,
+                          mock_report_results):
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
 
@@ -178,11 +177,6 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
 
-        mock_with_conn = mock_con.return_value__enter__.return_value
-        mock_producer = mock_with_conn.Producer.return_value
-        mock_pub = mock_producer.publish
-        mock_pub.return_value = True
-
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -192,9 +186,16 @@ class TestCLI(TestCase):
 
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual('Mount failed.',
-                         mock_con.mock_calls[3][1][0]['results']['ami-123456789']['./dev/xvdf'][
-                             './dev/xvdf1']['error'])
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('results', results)
+        self.assertIn(image_id, results['results'])
+        self.assertEqual(
+            'Mount failed.',
+            results['results'][image_id]['./dev/xvdf']['./dev/xvdf1']['error']
+        )
 
     @staticmethod
     def prep_fs(drive_path):
@@ -256,3 +257,45 @@ class TestCLI(TestCase):
             f.write(centos_release)
         with open('{}/xvdf2/etc/os-release'.format(drive_path), 'w') as f:
             f.write(dedent(centos_os_release))
+
+    @patch('cli.boto3')
+    def test_get_sqs_queue_url_for_existing_queue(self, mock_boto3):
+        """
+        Test getting URL for existing SQS queue.
+
+        Note: This function was copied verbatim from `cloudigrade`.
+
+        FIXME: Move this function to a shared library.
+        """
+        mock_client = mock_boto3.client.return_value
+        queue_name = Mock()
+        expected_url = Mock()
+        mock_client.get_queue_url.return_value = {'QueueUrl': expected_url}
+        queue_url = _get_sqs_queue_url(queue_name)
+        self.assertEqual(queue_url, expected_url)
+        mock_client.get_queue_url.assert_called_with(QueueName=queue_name)
+
+    @patch('cli.boto3')
+    def test_get_sqs_queue_url_creates_new_queue(self, mock_boto3):
+        """
+        Test getting URL for a SQS queue that does not yet exist.
+
+        Note: This function was copied verbatim from `cloudigrade`.
+
+        FIXME: Move this function to a shared library.
+        """
+        mock_client = mock_boto3.client.return_value
+        queue_name = Mock()
+        expected_url = Mock()
+        error_response = {
+            'Error': {
+                'Code': '.NonExistentQueue'
+            }
+        }
+        exception = ClientError(error_response, Mock())
+        mock_client.get_queue_url.side_effect = exception
+        mock_client.create_queue.return_value = {'QueueUrl': expected_url}
+        queue_url = _get_sqs_queue_url(queue_name)
+        self.assertEqual(queue_url, expected_url)
+        mock_client.get_queue_url.assert_called_with(QueueName=queue_name)
+        mock_client.create_queue.assert_called_with(QueueName=queue_name)
