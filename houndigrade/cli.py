@@ -1,5 +1,4 @@
 """Command line script for inspecting attached volumes."""
-import base64
 import glob
 import json
 import os
@@ -152,10 +151,7 @@ def report_results(results):
         results (dict): The results of the finished inspection.
 
     """
-    message_body = base64.b64encode(
-        jsonpickle.encode(results).encode('utf-8')
-    ).decode('utf-8')
-
+    message_body = jsonpickle.encode(results)
     queue_name = os.getenv('RESULTS_QUEUE_NAME')
     queue_url = _get_sqs_queue_url(queue_name)
 
