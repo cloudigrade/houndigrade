@@ -74,9 +74,11 @@ print('sqs://{}:{}@'.format(
 ))
 ```
 
-To run houndigrade locally use docker-compose
-
-    docker-compose up
+To run houndigrade locally, follow these steps:
+1. Create a folder called test-disks ie. `mkdir ./test-disks`
+2. Download all of the block devices found [here](https://drive.google.com/open?id=1xvxnmqJ6H9UF7iE5bN2twat01F8FwsaD)
+3. Move the downloaded block devices to test-disks.
+4. Now use docker-compose: `docker-compose up`
 
 This will start the houndigrade container, mount provided block
 devices inside said container, and run a scan against it, placing the results

@@ -5,12 +5,20 @@ services:
     build: .
     entrypoint: ./entrypoint.sh
     environment:
+      - AWS_DEFAULT_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - EXCHANGE_NAME
       - QUEUE_CONNECTION_URL
       - RESULTS_QUEUE_NAME=${AWS_SQS_QUEUE_NAME_PREFIX}inspection_results
     volumes:
       - ./docker/dev-entrypoint.sh:/opt/houndigrade/entrypoint.sh
-      - ./docker/rh_disk:/dev/rh_disk
-      - ./docker/nrh_disk:/dev/nrh_disk
-      - ./docker/both_disk:/dev/both_disk
+      - ./test-disks/rh_release_disk:/dev/rh_release_disk
+      - ./test-disks/nrh_disk:/dev/nrh_disk
+      - ./test-disks/2_part_release_nrh_disk:/dev/2_part_release_nrh_disk
+      - ./test-disks/rh_cert_disk:/dev/rh_cert_disk
+      - ./test-disks/rh_cert_release_disk:/dev/rh_cert_release_disk
+      - ./test-disks/rh_repo_disk:/dev/rh_repo_disk
+      - ./test-disks/rh_rpm_db_disk:/dev/rh_rpm_db_disk
       - /dev:/dev
     privileged: true
