@@ -1,4 +1,5 @@
 """Command line script for inspecting attached volumes."""
+import configparser
 import glob
 import json
 import os
@@ -114,9 +115,7 @@ def mount_and_inspect(drive, image_id, results, debug):
                                      rhel_product_certs
                                      )
                 check_enabled_repos(partition,
-                                    rhel_enabled_repos,
-                                    image_id,
-                                    debug
+                                    rhel_enabled_repos
                                     )
                 check_for_signed_packages(partition,
                                           rhel_signed_packages,
@@ -226,134 +225,6 @@ def report_results(results):
     )
 
 
-def echo_error(debug, command, partition, image_id, error):
-    """Echo an error at the debug level.
-
-    Args:
-        debug (bool): Bool regarding whether or not we are in debug mode.
-        command (str): The command we are trying to run.
-        partition (str): The partition we are currently checking.
-        image_id (str): The image that we are currently checking.
-        error (str): The error that resulted from attempting the command.
-    """
-    if debug:
-        click.echo(
-            _('The `{}` command ran on {} on image '
-              '"{}" failed with error: {}').format(command,
-                                                   partition,
-                                                   image_id,
-                                                   error),
-            err=True
-        )
-
-
-def try_subprocess_check_output(debug, command, partition, image_id):
-    """Attempt to run subprocess.check_output on the given command.
-
-    Args:
-        debug (bool): Bool regarding whether or not we are in debug mode.
-        command (str): The command we are trying to run.
-        partition (str): The partition we are currently checking.
-        image_id (str): The image that we are currently checking.
-    """
-    try:
-        subprocess.check_output([command],
-                                stderr=subprocess.PIPE,
-                                shell=True,
-                                encoding='utf-8'
-                                )
-    except subprocess.CalledProcessError as e:
-        echo_error(debug, command, partition, image_id, e.stderr)
-
-
-def check_enabled_repos(partition, results, image_id, debug):
-    """
-    Run the chroot yum repolist enabled command to gather enabled repos.
-
-    Args:
-        partition (str): The partition we are currently checking.
-        results (dict): Part of the results dict to which
-        we should be writing our results.
-        image_id (str): The image that we are currently checking.
-        debug (bool): Bool regarding whether or not we are in debug mode.
-    """
-    chroot_yum_command = 'chroot {} yum repolist enabled'.format(INSPECT_PATH)
-    rhel_repos = []
-    prepare_new_root_dir(partition, image_id, debug)
-    try:
-        chroot_yum_result = subprocess.check_output([chroot_yum_command],
-                                                    stderr=subprocess.PIPE,
-                                                    shell=True,
-                                                    encoding='utf-8'
-                                                    )
-        results['yum_enabled_repos_result'] = chroot_yum_result
-        repo_results = chroot_yum_result.split('\n')
-        rhel_repos = check_repos_for_rhel(repo_results)
-        results['rhel_enabled_repos'] = rhel_repos
-        if rhel_repos:
-            results[RHEL_FOUND] = True
-            click.echo(_('RHEL found via enabled repos on: {}').format(
-                partition))
-        else:
-            results[RHEL_FOUND] = False
-            click.echo(_('RHEL not found via enabled repos on: {}').format(
-                partition))
-
-    except subprocess.CalledProcessError as e:
-        results[RHEL_FOUND] = False
-        results['rhel_enabled_repos'] = rhel_repos
-        results['error'] = e.stderr
-        echo_error(debug, chroot_yum_command, partition, image_id, e.stderr)
-
-
-def prepare_new_root_dir(partition, image_id, debug):
-    """Create /dev random urandom in root dir to prepare partition for yum.
-
-    Args:
-        partition (str): The partition we are currently checking.
-        image_id (str): The image that we are currently checking.
-        debug (bool): Bool regarding whether or not we are in debug mode.
-    """
-    # The following commands attempt to create the /dev directory
-    # and the kernel random number source devices (random & urandom)
-    # if they do not already exist. The /dev directory & random/urandom
-    # files are needed to run the yum command successfully
-    # on a partition. Learn more about the random/urandom files
-    # at https://linux.die.net/man/4/urandom
-    mkdir = 'mkdir {}/dev'.format(INSPECT_PATH)
-    mknod_random = 'mknod -m 666 {}/dev/random c 1 8'.format(INSPECT_PATH)
-    mknod_urandom = 'mknod -m 666 {}/dev/urandom c 1 9'.format(INSPECT_PATH)
-
-    try_subprocess_check_output(debug, mkdir, partition, image_id)
-    try_subprocess_check_output(debug, mknod_random, partition, image_id)
-    try_subprocess_check_output(debug, mknod_urandom, partition, image_id)
-
-
-def check_repos_for_rhel(results):
-    """
-    Check the results of yum repolist enabled for RHEL repos.
-
-    Args:
-        results (list): A list of lines from the std_out of the
-        yum repolist enabled command that we need to check for rhel.
-    """
-    result = []
-    repos = []
-    for line in results:
-        if 'repo id' in line or 'repo name' in line:
-            repos = results[results.index(line) + 1:]
-    if repos:
-        for line in repos:
-            repo, _, remainder = line.partition(' ')
-            repo_name, _, _ = remainder.rpartition(' ')
-            repo = repo.strip()
-            repo_name = repo_name.strip()
-            for name in RHEL_REPOS:
-                if name in repo_name.lower():
-                    result.append({'repo': repo, 'name': repo_name})
-    return result
-
-
 def check_for_rhel_certs(partition, results):
     """
     Check os for rhel certificates.
@@ -451,7 +322,13 @@ def check_for_signed_packages(partition, results, image_id, debug):
         signed_rpm_count = int(rpm_result.strip())
     except subprocess.CalledProcessError as e:
         results['error'] = e.stderr
-        echo_error(debug, rpm_command, partition, image_id, e.stderr)
+        if debug:
+            click.echo(_('The `{}` command ran on {} on image "{}"'
+                         'failed with error: {}.'.format(rpm_command,
+                                                         partition,
+                                                         image_id,
+                                                         e.stderr)))
+
     if signed_rpm_count:
         results['rhel_found'] = True
         click.echo(_('RHEL found via signed packages on: {}').format(
@@ -509,6 +386,91 @@ def check_file(file_path):
     except FileNotFoundError as e:
         click.echo('{}'.format(e))
         return False, None
+
+
+def find_yum_repos_via_config(partition):
+    """
+    Find all of the files that might contain repo information.
+
+    Returns (list): A list of file paths to any files that might contain
+        repo information
+
+    """
+    # if not specified in the yum config the default repos dir is
+    # INSPECT_PATH/etc/yum.repos.d
+    repo_file_dir = '{}/etc/yum.repos.d'.format(INSPECT_PATH)
+    yum_config_path = glob.glob('{}/etc/yum.conf'.format(INSPECT_PATH))
+    if yum_config_path:
+        # check the yum config file to get any specified path to the
+        # yum repo directory
+        parser = configparser.ConfigParser()
+        parser.read(yum_config_path[0])
+        if parser['main'].get('reposdir'):
+            repo_file_dir = '{}{}'.format(INSPECT_PATH,
+                                          parser['main']['reposdir'])
+    else:
+        click.echo(_('No yum.conf file found on : {}'.format(partition)))
+    # now get all of the .repo files within
+    repo_files = glob.glob('{}/*.repo'.format(repo_file_dir))
+    if not repo_files:
+        click.echo(_('No .repo files found on : {}'.format(partition)))
+    # it is also possible to list repos inside of the yum.conf file so we
+    # want to add it to the list of files to check if it exists
+    if yum_config_path:
+        repo_files.append(yum_config_path[0])
+    return repo_files
+
+
+def check_repo_files(file_paths):
+    """
+    Check the given files to extract any enabled RHEL repos.
+
+    Args:
+        file_paths (list): A list of files to check for enabled RHEL repos.
+
+    Returns:
+        (list) : A list of dictionaries that contains info on the repo
+        & repo name of any RHEL enabled repos.
+
+    """
+    rhel_repos = []
+    for file in file_paths:
+        parser = configparser.ConfigParser()
+        parser.read(file)
+        for repo in parser.sections():
+            for repo_name in RHEL_REPOS:
+                if repo_name in parser[repo].get('name', '').lower() and \
+                        parser[repo].get('enabled') == '1':
+                    rhel_repos.append({'repo': repo,
+                                       'name': parser[repo].get('name')})
+    # now we want to deduplicate the dictionaries inside the list in case they
+    # are listed in more than 1 file
+    rhel_repos = [dict(deduplicated_entry) for deduplicated_entry in
+                  {tuple(entry.items()) for entry in rhel_repos}]
+    return rhel_repos
+
+
+def check_enabled_repos(partition, results):
+    """
+    Check the partition for any yum enabled RHEL repos.
+
+    Args:
+        partition (str): The partition we are currently checking.
+        results (dict): Part of the results dict to which we should be
+        writing our results.
+
+    """
+    repo_files = find_yum_repos_via_config(partition)
+    rhel_repos = check_repo_files(repo_files)
+    if rhel_repos:
+        results[RHEL_FOUND] = True
+        click.echo(_('RHEL found via enabled repos on: {}').format(
+            partition))
+    else:
+        results[RHEL_FOUND] = False
+        click.echo(_('RHEL not found via enabled repos on: {}').format(
+            partition))
+    results['rhel_enabled_repos'] = rhel_repos
 
 
 if __name__ == '__main__':

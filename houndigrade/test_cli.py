@@ -25,14 +25,11 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_rhel_found_multiple_ways(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
+    def test_rhel_found_multiple_ways(self, mock_subprocess_check_output,
                                       mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        rhel_repo_result = '\nrepo id repo name\njb-eap-7-for-rhel-7-server-rpms/$releasever/x86_64 JBoss Enterprise Appli 0\nrhel-7-server-rpms/$releasever/x86_64 Red Hat Enterprise Lin 0\nrhel7-cdn-internal/$releasever/x86_64 RHEL 7 - x86_64 0\n'
-        no_repo_result = '\n'
         rhel_packages_result = '448\n'
         no_packages_result = '0\n'
 
@@ -44,24 +41,29 @@ class TestCLI(TestCase):
                         './dev/xvdf/xvdf2/etc/os-release', ]
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf1/etc/pki/product/69.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.conf',
+                        './dev/xvdf/xvdf2/etc/yum.conf']
+            elif '/*.repo' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.repos.d/rhel7-internal.repo',
+                        './dev/xvdf/xvdf1/etc/yum.repos.d/rhel.repo',
+                        './dev/xvdf/xvdf2/etc/yum.repos.d/rhel7-internal.repo']
             else:
-                return ['./dev/xvdf1', './dev/xvdf2', ]
+                return ['./dev/xvdf1', './dev/xvdf2']
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [rhel_repo_result, rhel_packages_result,
-                                                    no_repo_result, no_packages_result]
+        mock_subprocess_check_output.side_effect = [rhel_packages_result, no_packages_result]
 
         runner = CliRunner()
 
         with runner.isolated_filesystem():
             self.prep_fs(drive_path)
+            self.prepare_fs_with_rhel_repos(drive_path)
 
             result = runner.invoke(
                 main,
                 ['-c', cloud, '--debug', '-t', image_id, drive_path]
             )
-
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(mock_subprocess_run.call_count, 4)
 
@@ -78,13 +80,14 @@ class TestCLI(TestCase):
         self.assertIn('RHEL found via enabled repos on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL found via product certificate on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL found via signed packages on: ./dev/xvdf1', result.output)
-        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf1', result.output)
-        self.assertIn('RHEL not found via release file on: ./dev/xvdf2', result.output)
-        self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL found via product certificate on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL found via release file on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL found on: ami-1234567', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-extras", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-optional", "name": "RHEL 7 - $basearch"}', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -101,15 +104,11 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_cli_disappearing_files(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
+    def test_cli_disappearing_files(self, mock_subprocess_check_output,
                                     mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
-        e = CalledProcessError(1, 'chroot yum repolist enabled',
-                               stderr='chroot: failed to run command \xe2\x80\x98yum\xe2\x80\x99: No such file or directory\n')
         no_packages_result = '0\n'
 
         def mock_glob_side_effect(pattern):
@@ -118,13 +117,15 @@ class TestCLI(TestCase):
                         './dev/xvdf/xvdf1/etc/os-release',
                         './dev/xvdf/xvdf2/etc/centos-release',
                         './dev/xvdf/xvdf2/etc/os-release', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [no_repo_result, no_packages_result,
-                                                    e, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
 
         runner = CliRunner()
 
@@ -154,22 +155,20 @@ class TestCLI(TestCase):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
-        e = CalledProcessError(1, 'chroot yum repolist enabled',
-                               stderr='chroot: failed to run command \xe2\x80\x98yum\xe2\x80\x99: No such file or directory\n')
         no_packages_result = '0\n'
-        mkdir_e = CalledProcessError(1, 'mkdir /dev',
-                               stderr='mkdir: failed to create directory \xe2\x80\x98/dev\xe2\x80\x99: File exists\n')
 
         def mock_glob_side_effect(pattern):
             if 'etc/*-release' in pattern:
+                return []
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
                 return []
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_subprocess_check_output.side_effect = [mkdir_e, mkdir_e, mkdir_e, no_repo_result, no_packages_result,
-                                                    mkdir_e, mkdir_e, mkdir_e, e, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
 
         runner = CliRunner()
 
@@ -201,34 +200,36 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_rhel_not_found(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
-                            mock_subprocess_run, mock_glob_glob, mock_report_results):
+    def test_rhel_not_found(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
-        e = CalledProcessError(1, 'chroot yum repolist enabled', stderr='chroot: failed to run command \xe2\x80\x98yum\xe2\x80\x99: No such file or directory\n')
         no_packages_result = '0\n'
+        e = CalledProcessError(1, 'mount', stderr='Mount failed.')
 
         def mock_glob_side_effect(pattern):
             if 'etc/*-release' in pattern:
                 return []
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.conf',
+                        './dev/xvdf/xvdf2/etc/yum.conf']
+            elif '/*.repo' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.repos.d/rhel7-internal.repo',
+                        './dev/xvdf/xvdf2/etc/yum.repos.d/random.repo',]
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [no_repo_result, no_packages_result,
-                                                    e, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, e]
 
         runner = CliRunner()
 
         with runner.isolated_filesystem():
             pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
                                                               exist_ok=True)
+            self.prepare_fs_with_non_enabled_repos(drive_path)
             result = runner.invoke(main,
                                    ['-c', cloud, '--debug', '-t', image_id,
                                     drive_path])
@@ -254,12 +255,12 @@ class TestCLI(TestCase):
                 _('No release files found on {}'.format('./dev/xvdf2'))),
             result.output)
         self.assertIn('RHEL not found on: ami-1234567', result.output)
-        self.assertIn('The `chroot /mnt/inspect yum repolist enabled` command ran on ./dev/xvdf2 on image "ami-123456789" failed with error: chroot: ', result.output)
         self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via signed packages on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf2', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -281,7 +282,6 @@ class TestCLI(TestCase):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        rhel_repo_result = '\nrepo id repo name\njb-eap-7-for-rhel-7-server-rpms/$releasever/x86_64 JBoss Enterprise Appli 0\nrhel-7-server-rpms/$releasever/x86_64 Red Hat Enterprise Lin 0\nrhel7-cdn-internal/$releasever/x86_64 RHEL 7 - x86_64 0\n'
         no_packages_result = '0\n'
 
         def mock_glob_side_effect(pattern):
@@ -289,18 +289,25 @@ class TestCLI(TestCase):
                 return []
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.conf',
+                        './dev/xvdf/xvdf2/etc/yum.conf']
+            elif '/*.repo' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.repos.d/rhel7-internal.repo',
+                        './dev/xvdf//xvdf1/etc/yum.repos.d/rhel.repo',
+                        './dev/xvdf/xvdf2/etc/yum.repos.d/rhel7-internal.repo']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_subprocess_check_output.side_effect = [None, None, None, rhel_repo_result, no_packages_result,
-                                                    None, None, None, rhel_repo_result, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
 
         runner = CliRunner()
 
         with runner.isolated_filesystem():
             pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
                                                               exist_ok=True)
+            self.prepare_fs_with_rhel_repos(drive_path)
             result = runner.invoke(main,
                                    ['-c', cloud, '--debug', '-t', image_id,
                                     drive_path])
@@ -322,6 +329,9 @@ class TestCLI(TestCase):
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf2', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-extras", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-optional", "name": "RHEL 7 - $basearch"}', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -338,13 +348,144 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_rhel_found_via_signed_package(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
-                                           mock_subprocess_run, mock_glob_glob, mock_report_results):
+    def test_rhel_found_via_enabled_repos_specified_dir(self, mock_subprocess_check_output,
+                                                        mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
+        no_packages_result = '0\n'
+
+        def mock_glob_side_effect(pattern):
+            if 'etc/*-release' in pattern:
+                return []
+            elif '/etc/pki/product/*' in pattern:
+                return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/yum.conf']
+            elif '/*.repo' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo']
+            else:
+                return ['./dev/xvdf1', './dev/xvdf2', ]
+
+        mock_glob_glob.side_effect = mock_glob_side_effect
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+            self.prepare_fs_with_reposdir_specified(drive_path)
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertTrue(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf1'))),
+            result.output)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf2'))),
+            result.output)
+        self.assertIn('RHEL found on: ami-1234567', result.output)
+        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via product certificate on: ./dev/xvdf2', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-extras", "name": "RHEL 7 - $basearch"}', result.output)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn(image_id, results['images'])
+        self.assertTrue(results['images'][image_id]['rhel_found'])
+        self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
+        self.assertTrue(results['images'][image_id]['rhel_enabled_repos_found'])
+        self.assertFalse(results['images'][image_id]['rhel_product_certs_found'])
+        self.assertFalse(results['images'][image_id]['rhel_release_files_found'])
+
+    @patch('cli.report_results')
+    @patch('cli.glob.glob')
+    @patch('cli.subprocess.run')
+    @patch('cli.subprocess.check_output')
+    def test_rhel_found_via_enabled_repos_no_conf(self, mock_subprocess_check_output,
+                                                  mock_subprocess_run, mock_glob_glob, mock_report_results):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
+        no_packages_result = '0\n'
+
+        def mock_glob_side_effect(pattern):
+            if 'etc/*-release' in pattern:
+                return []
+            elif '/etc/pki/product/*' in pattern:
+                return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo']
+            else:
+                return ['./dev/xvdf1', './dev/xvdf2', ]
+
+        mock_glob_glob.side_effect = mock_glob_side_effect
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+            self.prepare_fs_with_reposdir_specified(drive_path)
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertTrue(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf1'))),
+            result.output)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf2'))),
+            result.output)
+        self.assertIn('RHEL found on: ami-1234567', result.output)
+        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL found via enabled repos on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via product certificate on: ./dev/xvdf2', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}', result.output)
+        self.assertIn('{"repo": "rhel7-cdn-internal-extras", "name": "RHEL 7 - $basearch"}', result.output)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn(image_id, results['images'])
+        self.assertTrue(results['images'][image_id]['rhel_found'])
+        self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
+        self.assertTrue(results['images'][image_id]['rhel_enabled_repos_found'])
+        self.assertFalse(results['images'][image_id]['rhel_product_certs_found'])
+        self.assertFalse(results['images'][image_id]['rhel_release_files_found'])
+
+    @patch('cli.report_results')
+    @patch('cli.glob.glob')
+    @patch('cli.subprocess.run')
+    @patch('cli.subprocess.check_output')
+    def test_rhel_found_via_signed_package(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
         rhel_packages_result = '1\n'
         no_packages_result = '0\n'
 
@@ -353,13 +494,15 @@ class TestCLI(TestCase):
                 return []
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [no_repo_result, rhel_packages_result,
-                                                    no_repo_result, no_packages_result]
+        mock_subprocess_check_output.side_effect = [rhel_packages_result, no_packages_result]
 
         runner = CliRunner()
 
@@ -382,11 +525,15 @@ class TestCLI(TestCase):
             result.output)
         self.assertIn('RHEL found on: ami-1234567', result.output)
         self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf1', result.output)
+        self.assertIn('No yum.conf file found on : ./dev/xvdf1', result.output)
+        self.assertIn('No .repo files found on : ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL found via signed packages on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
         self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
         self.assertIn('RHEL not found via product certificate on: ./dev/xvdf2', result.output)
+        self.assertIn('No yum.conf file found on : ./dev/xvdf2', result.output)
+        self.assertIn('No .repo files found on : ./dev/xvdf2', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -403,13 +550,10 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_rhel_found_via_product_cert(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
-                                         mock_subprocess_run, mock_glob_glob, mock_report_results):
+    def test_rhel_found_via_product_cert(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
         no_packages_result = '0\n'
 
         def mock_glob_side_effect(pattern):
@@ -418,13 +562,15 @@ class TestCLI(TestCase):
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf1/etc/pki/product/69.pem',
                         './dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [no_repo_result, no_packages_result,
-                                                    no_repo_result, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
 
         runner = CliRunner()
 
@@ -468,13 +614,10 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
-    @patch('cli.prepare_new_root_dir')
-    def test_rhel_found_via_release_file(self, mock_prepare_new_root_dir, mock_subprocess_check_output,
-                                         mock_subprocess_run, mock_glob_glob, mock_report_results):
+    def test_rhel_found_via_release_file(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
         drive_path = './dev/xvdf'
-        no_repo_result = '\n'
         no_packages_result = '0\n'
 
         def mock_glob_side_effect(pattern):
@@ -485,13 +628,15 @@ class TestCLI(TestCase):
                         './dev/xvdf/xvdf2/etc/os-release', ]
             elif '/etc/pki/product/*' in pattern:
                 return ['./dev/xvdf/xvdf2/etc/pki/product/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_prepare_new_root_dir.return_value = None
-        mock_subprocess_check_output.side_effect = [no_repo_result, no_packages_result,
-                                                    no_repo_result, no_packages_result]
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
 
         runner = CliRunner()
 
@@ -623,6 +768,195 @@ class TestCLI(TestCase):
             f.write(centos_release)
         with open('{}/xvdf2/etc/os-release'.format(drive_path), 'w') as f:
             f.write(dedent(centos_os_release))
+
+    @staticmethod
+    def prepare_fs_with_rhel_repos(drive_path):
+        pathlib.Path('{}/xvdf1/etc'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+        pathlib.Path('{}/xvdf2/etc'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+        pathlib.Path('{}/xvdf1/etc/yum.repos.d'.format(drive_path)).mkdir(parents=True,
+                                                                          exist_ok=True)
+        pathlib.Path('{}/xvdf2/etc/yum.repos.d'.format(drive_path)).mkdir(parents=True,
+                                                                          exist_ok=True)
+
+        yum_conf = """\
+            [main]
+            cachedir=/var/cache/yum/$basearch/$releasever
+            keepcache=0
+            debuglevel=2
+            logfile=/var/log/yum.log
+            exactarch=1
+            obsoletes=1
+            gpgcheck=1
+            plugins=1
+            installonly_limit=3
+            
+            #  This is the default, if you make this bigger yum won't see if the metadata
+            # is newer on the remote and so you'll "gain" the bandwidth of not having to
+            # download the new metadata and "pay" for it by yum not having correct
+            # information.
+            #  It is esp. important, to have correct metadata, for distributions like
+            # Fedora which don't keep old packages around. If you don't like this checking
+            # interupting your command line usage, it's much better to have something
+            # manually check the metadata once an hour (yum-updatesd will do this).
+            # metadata_expire=90m
+            
+            # PUT YOUR REPOS HERE OR IN separate files named file.repo
+            # in /etc/yum.repos.d"""
+
+        yum_repo_file = """\
+            [rhel7-cdn-internal]
+            name=RHEL 7 - $basearch
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
+            enabled=1
+            gpgcheck=0
+             
+            [rhel7-cdn-internal-extras]
+            name=RHEL 7 - $basearch
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
+            enabled=1
+            gpgcheck=0"""
+
+        more_rhel_repos = """\
+            [rhel7-cdn-internal-optional]
+            name=RHEL 7 - $basearch
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/optional/os/
+            enabled=1
+            gpgcheck=0"""
+
+        with open('{}/xvdf1/etc/yum.conf'.format(drive_path), 'w') as f:
+            f.write(yum_conf)
+        with open('{}/xvdf1/etc/yum.repos.d/rhel7-internal.repo'.format(drive_path), 'w') as f:
+            f.write(yum_repo_file)
+        with open('{}/xvdf1/etc/yum.repos.d/rhel.repo'.format(drive_path), 'w') as f:
+            f.write(more_rhel_repos)
+        with open('{}/xvdf2/etc/yum.conf'.format(drive_path), 'w') as f:
+            f.write(yum_conf)
+        with open('{}/xvdf2/etc/yum.repos.d/rhel7-internal.repo'.format(drive_path), 'w') as f:
+            f.write(yum_repo_file)
+
+    @staticmethod
+    def prepare_fs_with_non_enabled_repos(drive_path):
+        pathlib.Path('{}/xvdf1/etc'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+        pathlib.Path('{}/xvdf2/etc'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+        pathlib.Path('{}/xvdf1/etc/yum.repos.d'.format(drive_path)).mkdir(parents=True,
+                                                                          exist_ok=True)
+        pathlib.Path('{}/xvdf2/etc/yum.repos.d'.format(drive_path)).mkdir(parents=True,
+                                                                          exist_ok=True)
+
+        yum_conf = """\
+            [main]
+            cachedir=/var/cache/yum/$basearch/$releasever
+            keepcache=0
+            debuglevel=2
+            logfile=/var/log/yum.log
+            exactarch=1
+            obsoletes=1
+            gpgcheck=1
+            plugins=1
+            installonly_limit=3
+
+            #  This is the default, if you make this bigger yum won't see if the metadata
+            # is newer on the remote and so you'll "gain" the bandwidth of not having to
+            # download the new metadata and "pay" for it by yum not having correct
+            # information.
+            #  It is esp. important, to have correct metadata, for distributions like
+            # Fedora which don't keep old packages around. If you don't like this checking
+            # interupting your command line usage, it's much better to have something
+            # manually check the metadata once an hour (yum-updatesd will do this).
+            # metadata_expire=90m
+
+            # PUT YOUR REPOS HERE OR IN separate files named file.repo
+            # in /etc/yum.repos.d"""
+
+        non_enabled_repo_file = """\
+            [rhel7-cdn-internal]
+            name=RHEL 7 - $basearch
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
+            enabled=0
+            gpgcheck=0
+
+            [rhel7-cdn-internal-extras]
+            name=RHEL 7 - $basearch
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
+            enabled=0
+            gpgcheck=0
+            """
+
+        non_rhel_repo_file = """\
+            [random-cdn-internal]
+            name=Random repo
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
+            enabled=1
+            gpgcheck=0
+    
+            [random-cdn-internal-extras]
+            name=Random repo 
+            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
+            enabled=1
+            gpgcheck=0
+            """
+        with open('{}/xvdf1/etc/yum.conf'.format(drive_path), 'w') as f:
+            f.write(yum_conf)
+        with open('{}/xvdf1/etc/yum.repos.d/rhel7-internal.repo'.format(drive_path), 'w') as f:
+            f.write(non_enabled_repo_file)
+        with open('{}/xvdf2/etc/yum.conf'.format(drive_path), 'w') as f:
+            f.write(yum_conf)
+        with open('{}/xvdf2/etc/yum.repos.d/random.repo'.format(drive_path), 'w') as f:
+            f.write(non_rhel_repo_file)
+
+    @staticmethod
+    def prepare_fs_with_reposdir_specified(drive_path):
+        pathlib.Path('{}/xvdf1/etc'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+        pathlib.Path('{}/xvdf1/etc/new_dir/yum_repos'.format(drive_path)).mkdir(parents=True,
+                                                                                exist_ok=True)
+
+        yum_conf = """\
+                [main]
+                cachedir=/var/cache/yum/$basearch/$releasever
+                keepcache=0
+                debuglevel=2
+                logfile=/var/log/yum.log
+                exactarch=1
+                obsoletes=1
+                gpgcheck=1
+                plugins=1
+                installonly_limit=3
+                reposdir=/etc/new_dir/yum_repos
+
+                #  This is the default, if you make this bigger yum won't see if the metadata
+                # is newer on the remote and so you'll "gain" the bandwidth of not having to
+                # download the new metadata and "pay" for it by yum not having correct
+                # information.
+                #  It is esp. important, to have correct metadata, for distributions like
+                # Fedora which don't keep old packages around. If you don't like this checking
+                # interupting your command line usage, it's much better to have something
+                # manually check the metadata once an hour (yum-updatesd will do this).
+                # metadata_expire=90m
+
+                # PUT YOUR REPOS HERE OR IN separate files named file.repo
+                # in /etc/yum.repos.d"""
+
+        yum_repo_file = """\
+                    [rhel7-cdn-internal]
+                    name=RHEL 7 - $basearch
+                    baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
+                    enabled=1
+                    gpgcheck=0
+
+                    [rhel7-cdn-internal-extras]
+                    name=RHEL 7 - $basearch
+                    baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
+                    enabled=1
+                    gpgcheck=0"""
+        with open('{}/xvdf1/etc/yum.conf'.format(drive_path), 'w') as f:
+            f.write(yum_conf)
+        with open('{}/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo'.format(drive_path), 'w') as f:
+            f.write(yum_repo_file)
 
     @patch('cli.boto3')
     def test_get_sqs_queue_url_for_existing_queue(self, mock_boto3):
