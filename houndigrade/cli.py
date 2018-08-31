@@ -11,6 +11,7 @@ import boto3
 import click
 import jsonpickle
 from botocore.exceptions import ClientError
+from raven import Client
 
 INSPECT_PATH = '/mnt/inspect'
 RHEL_FOUND = 'rhel_found'
@@ -82,15 +83,12 @@ def mount_and_inspect(drive, image_id, results, debug):
     click.echo(_('Checking drive {}').format(drive))
     results['images'][image_id] = results['images'].get(image_id, {})
     results['images'][image_id][RHEL_FOUND] = False
-    results['images'][image_id]['rhel_signed_packages_found'] = \
-        False
-    results['images'][image_id]['rhel_product_certs_found'] = \
-        False
-    results['images'][image_id]['rhel_release_files_found'] = \
-        False
-    results['images'][image_id]['rhel_enabled_repos_found'] = \
-        False
+    results['images'][image_id]['rhel_signed_packages_found'] = False
+    results['images'][image_id]['rhel_product_certs_found'] = False
+    results['images'][image_id]['rhel_release_files_found'] = False
+    results['images'][image_id]['rhel_enabled_repos_found'] = False
     results['images'][image_id][drive] = {}
+
     for partition in get_partitions(drive):
         click.echo(_('Checking partition {}').format(partition))
         rhel_release_files = {}
@@ -108,20 +106,11 @@ def mount_and_inspect(drive, image_id, results, debug):
         results['images'][image_id][drive][partition] = partition_result
         try:
             with mount(partition, INSPECT_PATH):
-                check_release_files(partition,
-                                    rhel_release_files
-                                    )
-                check_for_rhel_certs(partition,
-                                     rhel_product_certs
-                                     )
-                check_enabled_repos(partition,
-                                    rhel_enabled_repos
-                                    )
-                check_for_signed_packages(partition,
-                                          rhel_signed_packages,
-                                          image_id,
-                                          debug
-                                          )
+                check_release_files(partition, rhel_release_files)
+                check_for_rhel_certs(partition, rhel_product_certs)
+                check_enabled_repos(partition, rhel_enabled_repos)
+                check_for_signed_packages(
+                    partition, rhel_signed_packages, image_id, debug)
 
                 rhel_found = rhel_release_files[RHEL_FOUND] or \
                     rhel_product_certs[RHEL_FOUND] or \
@@ -139,11 +128,9 @@ def mount_and_inspect(drive, image_id, results, debug):
                     rhel_enabled_repos[RHEL_FOUND]
 
                 if rhel_found:
-                    click.echo(_('RHEL found on: {}').format(
-                        image_id))
+                    click.echo(_('RHEL found on: {}').format(image_id))
                 else:
-                    click.echo(_('RHEL not found on: {}').format(
-                        image_id))
+                    click.echo(_('RHEL not found on: {}').format(image_id))
 
         except subprocess.CalledProcessError as e:
             click.echo(
@@ -331,8 +318,8 @@ def check_for_signed_packages(partition, results, image_id, debug):
 
     if signed_rpm_count:
         results['rhel_found'] = True
-        click.echo(_('RHEL found via signed packages on: {}').format(
-            partition))
+        click.echo(
+            _('RHEL found via signed packages on: {}').format(partition))
     else:
         results['rhel_found'] = False
         click.echo(_('RHEL not found via signed packages on: {}').format(
@@ -474,4 +461,15 @@ def check_enabled_repos(partition, results):
 
 
 if __name__ == '__main__':
-    main()
+    if os.getenv('HOUNDIGRADE_SENTRY_DSN', False):
+        raven = Client(
+            dsn=os.getenv('SENTRY_DSN'),
+            environment=os.getenv('HOUNDIGRADE_SENTRY_ENVIRONMENT'),
+            release=os.getenv('HOUNDIGRADE_SENTRY_RELEASE'),
+        )
+        try:
+            main()
+        except Exception:
+            raven.captureException()
+    else:
+        main()
