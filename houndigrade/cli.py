@@ -463,7 +463,7 @@ def check_enabled_repos(partition, results):
 if __name__ == '__main__':
     if os.getenv('HOUNDIGRADE_SENTRY_DSN', False):
         raven = Client(
-            dsn=os.getenv('SENTRY_DSN'),
+            dsn=os.getenv('HOUNDIGRADE_SENTRY_DSN'),
             environment=os.getenv('HOUNDIGRADE_SENTRY_ENVIRONMENT'),
             release=os.getenv('HOUNDIGRADE_SENTRY_RELEASE'),
         )
