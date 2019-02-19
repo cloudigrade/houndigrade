@@ -100,3 +100,24 @@ To run just our tests:
 
 If you wish to run a higher-level suite of integration tests, see
 [integrade](https://github.com/cloudigrade/integrade).
+
+### Manually running in AWS
+
+If you want to manually run houndigrade in AWS so that you can watch its output in real-time, you can *simulate* how the cloudigrade ECS task runs houndigrade by SSH-ing to an EC2 instance (running an ECS AMI) and running Docker with the arguments that would be used in the ECS task definition. For example:
+
+    docker run \
+        --mount type=bind,source=/dev,target=/dev \
+        --privileged --rm -i -t \
+        -e AWS_ACCESS_KEY_ID=AWS_SQS_ACCESS_KEY_ID \
+        -e AWS_DEFAULT_REGION="us-east-1" \
+        -e AWS_SECRET_ACCESS_KEY="AWS_SQS_SECRET_ACCESS_KEY" \
+        -e EXCHANGE_NAME="" \
+        -e QUEUE_CONNECTION_URL="sqs://AWS_SQS_ACCESS_KEY_ID:AWS_SQS_SECRET_ACCESS_KEY@" \
+        -e RESULTS_QUEUE_NAME="HOUNDIGRADE_RESULTS_QUEUE_NAME" \
+        --name houndi \
+        "registry.gitlab.com/cloudigrade/houndigrade:latest" \
+        -c aws \
+        -t ami-13469000000000000 /dev/sdf \
+        -t ami-12345678900000000 /dev/sdg
+
+You will need to set appropriate values for the `-e` variables passed into the environment, each of the `-t` arguments that define the inspection targets, and the specific version of the houndigrade image you wish to use. When you attach volumes in AWS, you can define the device paths they'll use, and they should match your target arguments here. Alternatively, you can describe the running EC2 instance to get the device paths.
