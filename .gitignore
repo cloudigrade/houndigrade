@@ -102,3 +102,6 @@ ENV/
 
 # test-disks
 test-disks/
+
+# Visual Studio Code configs
+.vscode/
