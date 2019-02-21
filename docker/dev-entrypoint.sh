@@ -8,6 +8,7 @@ losetup -P /dev/loop10 /dev/rh_cert_disk
 losetup -P /dev/loop11 /dev/rh_cert_release_disk
 losetup -P /dev/loop12 /dev/rh_repo_disk
 losetup -P /dev/loop13 /dev/rh_rpm_db_disk
+losetup -P /dev/loop14 /dev/bad_yum_conf
 
 scl enable rh-python36 'python cli.py \
     -t ami-rh-release-ami /dev/loop7 \
@@ -17,6 +18,9 @@ scl enable rh-python36 'python cli.py \
     -t ami-cert-release /dev/loop11 \
     -t ami-repo /dev/loop12 \
     -t ami-rpm-db /dev/loop13 \
+    -t ami-bad-yum-conf /dev/loop14 \
+    -t ami-not-a-mount /dev/null \
+    -t ami-invalid-path /po/ta/toes \
     '
 
 losetup -D

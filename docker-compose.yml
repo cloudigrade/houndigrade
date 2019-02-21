@@ -20,5 +20,6 @@ services:
       - ./test-disks/rh_cert_release_disk:/dev/rh_cert_release_disk
       - ./test-disks/rh_repo_disk:/dev/rh_repo_disk
       - ./test-disks/rh_rpm_db_disk:/dev/rh_rpm_db_disk
+      - ./test-disks/bad_yum_conf:/dev/bad_yum_conf
       - /dev:/dev
     privileged: true
