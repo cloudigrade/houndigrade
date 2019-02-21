@@ -155,6 +155,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -199,6 +201,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -254,6 +258,8 @@ class TestCLI(TestCase):
             elif '/*.repo' in pattern:
                 return ['./dev/xvdf/xvdf1/etc/yum.repos.d/rhel7-internal.repo',
                         './dev/xvdf/xvdf2/etc/yum.repos.d/random.repo',]
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -333,6 +339,8 @@ class TestCLI(TestCase):
                 return ['./dev/xvdf/xvdf1/etc/yum.repos.d/rhel7-internal.repo',
                         './dev/xvdf//xvdf1/etc/yum.repos.d/rhel.repo',
                         './dev/xvdf/xvdf2/etc/yum.repos.d/rhel7-internal.repo']
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -402,6 +410,8 @@ class TestCLI(TestCase):
                 return ['./dev/xvdf/xvdf1/etc/yum.conf']
             elif '/*.repo' in pattern:
                 return ['./dev/xvdf/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo']
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -470,6 +480,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return ['./dev/xvdf/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo']
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -543,6 +555,8 @@ class TestCLI(TestCase):
                 return ['/etc/yum.conf']
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1']
 
@@ -607,6 +621,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1']
 
@@ -671,6 +687,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -740,6 +758,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -807,6 +827,8 @@ class TestCLI(TestCase):
                 return []
             elif '/*.repo' in pattern:
                 return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
             else:
                 return ['./dev/xvdf1', './dev/xvdf2', ]
 
@@ -846,6 +868,63 @@ class TestCLI(TestCase):
         self.assertFalse(results['images'][image_id]['rhel_enabled_repos_found'])
         self.assertFalse(results['images'][image_id]['rhel_product_certs_found'])
         self.assertTrue(results['images'][image_id]['rhel_release_files_found'])
+
+    @patch('cli.report_results')
+    @patch('cli.glob.glob')
+    @patch('cli.subprocess.run')
+    def test_no_rpm_db_early_return(
+        self,
+        mock_subprocess_run,
+        mock_glob_glob,
+        mock_report_results,
+    ):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
+
+        def mock_glob_side_effect(pattern):
+            if 'etc/*-release' in pattern:
+                return []
+            elif '/etc/pki/product/*' in pattern:
+                return []
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
+            elif '/var/lib/rpm/*' in pattern:
+                return []
+            else:
+                return ['./dev/xvdf1']
+
+        mock_glob_glob.side_effect = mock_glob_side_effect
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertTrue(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn('errors', results)
+        self.assertIn(image_id, results['images'])
+        self.assertFalse(results['images'][image_id]['rhel_found'])
+        self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
+        self.assertFalse(results['images'][image_id]['rhel_enabled_repos_found'])
+        self.assertFalse(results['images'][image_id]['rhel_product_certs_found'])
+        self.assertFalse(results['images'][image_id]['rhel_release_files_found'])
+        self.assertEqual(
+            _('RPM DB directory on {0} has no data for {1}').format('./dev/xvdf1', image_id),
+            results['images'][image_id]['./dev/xvdf']['./dev/xvdf1']['facts']['rhel_signed_packages']['status'],
+        )
 
     @patch('cli.report_results')
     @patch('cli.glob.glob')

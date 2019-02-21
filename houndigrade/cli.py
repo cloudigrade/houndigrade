@@ -307,6 +307,16 @@ def check_for_signed_packages(partition, results, image_id, debug):
         debug (bool): Bool regarding whether or not we are in debug mode.
 
     """
+    if not glob.glob('{0}/var/lib/rpm/*'.format(INSPECT_PATH)):
+        message = _(
+            'RPM DB directory on {0} has no data for {1}'
+        ).format(partition, image_id)
+        click.echo(message)
+        results['rhel_found'] = False
+        results['rhel_signed_package_count'] = 0
+        results['status'] = message
+        return
+
     signed_rpm_count = 0
     rpm_format_statement = r'"%{DSAHEADER:pgpsig}|%{RSAHEADER:pgpsig}'\
         r'|%{SIGGPG:pgpsig}|%{SIGPGP:pgpsig}\n"'
