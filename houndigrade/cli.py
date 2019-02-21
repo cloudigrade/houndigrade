@@ -34,7 +34,7 @@ RH_KEY_IDS = ['199e2f91fd431d51',
 @click.option('--target',
               '-t',
               multiple=True,
-              type=(str, click.Path(exists=True)),
+              type=(str, click.Path()),
               required=True,
               help=_('Inspection target, the cloud specific image identifier'
                      ' and path to the attached drive on the machine. e.g.'
@@ -58,6 +58,7 @@ def main(cloud, target, debug):
     results = {
         'cloud': cloud,
         'images': {},
+        'errors': [],
     }
 
     for image_id, drive in target:
@@ -81,6 +82,13 @@ def mount_and_inspect(drive, image_id, results, debug):
 
     """
     click.echo(_('Checking drive {}').format(drive))
+
+    if not os.path.exists(drive):
+        message = _('Nothing found at path {} for {}').format(drive, image_id)
+        click.echo(message, err=True)
+        results['errors'].append(message)
+        return
+
     results['images'][image_id] = results['images'].get(image_id, {})
     results['images'][image_id][RHEL_FOUND] = False
     results['images'][image_id]['rhel_signed_packages_found'] = False
@@ -133,12 +141,12 @@ def mount_and_inspect(drive, image_id, results, debug):
                     click.echo(_('RHEL not found on: {}').format(image_id))
 
         except subprocess.CalledProcessError as e:
-            click.echo(
-                _('Mount of {} on image {} failed with error: {}').format(
-                    partition, image_id, e.stderr),
-                err=True
-            )
+            message = _(
+                'Mount of {} on image {} failed with error: {}'
+            ).format(partition, image_id, e.stderr),
+            click.echo(message, err=True)
             results['images'][image_id][drive][partition]['error'] = e.stderr
+            results['errors'].append(message)
 
 
 @contextmanager

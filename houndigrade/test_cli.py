@@ -94,12 +94,45 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertTrue(results['images'][image_id]['rhel_signed_packages_found'])
         self.assertTrue(results['images'][image_id]['rhel_enabled_repos_found'])
         self.assertTrue(results['images'][image_id]['rhel_product_certs_found'])
         self.assertTrue(results['images'][image_id]['rhel_release_files_found'])
+
+    @patch('cli.report_results')
+    @patch('cli.subprocess.run')
+    def test_results_error_when_mount_path_does_not_exist(
+        self,
+        mock_subprocess_run,
+        mock_report_results,
+    ):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertFalse(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn('errors', results)
+        self.assertNotIn(image_id, results['images'])
+        self.assertIn(
+            _('Nothing found at path {} for {}').format(drive_path, image_id),
+            results['errors'],
+        )
 
     @patch('cli.report_results')
     @patch('cli.glob.glob')
@@ -145,6 +178,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
 
     @patch('cli.report_results')
@@ -195,6 +229,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
 
     @patch('cli.report_results')
@@ -267,6 +302,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertFalse(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -338,6 +374,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -405,6 +442,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -472,6 +510,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -535,6 +574,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertFalse(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -599,6 +639,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertFalse(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -671,6 +712,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertTrue(results['images'][image_id]['rhel_signed_packages_found'])
@@ -735,6 +777,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -796,6 +839,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertTrue(results['images'][image_id]['rhel_found'])
         self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
@@ -834,6 +878,7 @@ class TestCLI(TestCase):
         results = mock_report_results.call_args[0][0]
         self.assertIn('cloud', results)
         self.assertIn('images', results)
+        self.assertIn('errors', results)
         self.assertIn(image_id, results['images'])
         self.assertEqual(
             'Mount failed.',
