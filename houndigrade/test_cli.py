@@ -1,4 +1,5 @@
 """Collection of tests for ``cli`` module."""
+import os
 import pathlib
 from textwrap import dedent
 from unittest import TestCase
@@ -545,6 +546,74 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
+    def test_rhel_not_found_with_unreadable_release_file(
+        self,
+        mock_subprocess_check_output,
+        mock_subprocess_run,
+        mock_glob_glob,
+        mock_report_results,
+    ):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
+        no_packages_result = '0\n'
+
+        def mock_glob_side_effect(pattern):
+            if 'etc/*-release' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/potato-release']
+            elif '/etc/pki/product/*' in pattern:
+                return []
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
+            else:
+                return ['./dev/xvdf1']
+
+        mock_glob_glob.side_effect = mock_glob_side_effect
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+            self.prepare_fs_with_bad_release_file(drive_path)
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertTrue(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf1'))),
+            result.output)
+        self.assertIn('Error reading release files on ./dev/xvdf1:', result.output)
+        self.assertIn('RHEL not found on: ami-1234567', result.output)
+        self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via product certificate on: ./dev/xvdf1', result.output)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn(image_id, results['images'])
+        self.assertFalse(results['images'][image_id]['rhel_found'])
+        self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
+        self.assertFalse(results['images'][image_id]['rhel_enabled_repos_found'])
+        self.assertFalse(results['images'][image_id]['rhel_product_certs_found'])
+        self.assertFalse(results['images'][image_id]['rhel_release_files_found'])
+        self.assertEqual(
+            'Error reading release files on ./dev/xvdf1: \'utf-8\' codec can\'t decode byte 0xac in position 0: invalid start byte',
+            results['images'][image_id]['./dev/xvdf']['./dev/xvdf1']['facts']['rhel_release_files']['status'],
+        )
+
+    @patch('cli.report_results')
+    @patch('cli.glob.glob')
+    @patch('cli.subprocess.run')
+    @patch('cli.subprocess.check_output')
     def test_rhel_found_via_signed_package(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
@@ -1028,6 +1097,16 @@ class TestCLI(TestCase):
         ).mkdir(parents=True, exist_ok=True)
         with open('{}/xvdf1/etc/yum.conf'.format(drive_path), 'wb') as f:
             f.write(b'\xac')  # not a valid utf8 string!
+
+    @staticmethod
+    def prepare_fs_with_bad_release_file(drive_path):
+        pathlib.Path(
+            '{}/xvdf1/etc/'.format(drive_path)
+        ).mkdir(parents=True, exist_ok=True)
+        release_file_path = '{}/xvdf1/etc/potato-release'.format(drive_path)
+        with open(release_file_path , 'wb') as f:
+            f.write(b'\xac')  # not a valid utf8 string!
+
 
     @patch('cli.boto3')
     def test_get_sqs_queue_url_for_existing_queue(self, mock_boto3):

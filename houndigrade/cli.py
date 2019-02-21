@@ -248,13 +248,15 @@ def check_release_files(partition, results):
 
     """
     release_file_paths = find_release_files()
-
+    results[RHEL_FOUND] = False
     if not release_file_paths:
-        click.echo(_('No release files found on {}').format(partition))
-        results[RHEL_FOUND] = False
-        results['status'] = _('No release files found on {}').format(partition)
-    else:
-        for release_file_path in release_file_paths:
+        message = _('No release files found on {}').format(partition)
+        click.echo(message)
+        results['status'] = message
+        return
+    exception_messages = []
+    for release_file_path in release_file_paths:
+        try:
             rhel_found, contents = check_file(release_file_path)
 
             if rhel_found:
@@ -275,6 +277,14 @@ def check_release_files(partition, results):
             results[RHEL_FOUND] = \
                 rhel_found or results.get(RHEL_FOUND, False)
             results['release_files'] = release_files
+        except Exception as e:
+            message = _(
+                'Error reading release files on {}: {}'
+            ).format(partition, e)
+            click.echo(message, err=True)
+            exception_messages.append(message)
+    if exception_messages:
+        results['status'] = '\n'.join(exception_messages)
 
 
 def check_for_signed_packages(partition, results, image_id, debug):
