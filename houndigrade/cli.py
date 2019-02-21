@@ -447,17 +447,24 @@ def check_enabled_repos(partition, results):
         writing our results.
 
     """
-    repo_files = find_yum_repos_via_config(partition)
-    rhel_repos = check_repo_files(repo_files)
-    if rhel_repos:
-        results[RHEL_FOUND] = True
-        click.echo(_('RHEL found via enabled repos on: {}').format(
-            partition))
-    else:
-        results[RHEL_FOUND] = False
-        click.echo(_('RHEL not found via enabled repos on: {}').format(
-            partition))
-    results['rhel_enabled_repos'] = rhel_repos
+    results[RHEL_FOUND] = False
+    try:
+        repo_files = find_yum_repos_via_config(partition)
+        rhel_repos = check_repo_files(repo_files)
+        if rhel_repos:
+            results[RHEL_FOUND] = True
+            click.echo(_('RHEL found via enabled repos on: {}').format(
+                partition))
+        else:
+            click.echo(_('RHEL not found via enabled repos on: {}').format(
+                partition))
+        results['rhel_enabled_repos'] = rhel_repos
+    except Exception as e:
+        message = _(
+            'Error reading yum repo files on {}: {}'
+        ).format(partition, e)
+        click.echo(message, err=True)
+        results['status'] = message
 
 
 if __name__ == '__main__':
