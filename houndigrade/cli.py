@@ -340,11 +340,10 @@ def check_for_signed_packages(partition, results, image_id, debug):
     except subprocess.CalledProcessError as e:
         results['error'] = e.stderr
         if debug:
-            click.echo(_('The `{}` command ran on {} on image "{}"'
-                         'failed with error: {}.'.format(rpm_command,
-                                                         partition,
-                                                         image_id,
-                                                         e.stderr)))
+            click.echo(_(
+                'The `{0}` command ran on {1} on image "{2}" failed with '
+                'error: {3}.'
+            ).format(rpm_command, partition, image_id, e.stderr))
 
     if signed_rpm_count:
         results['rhel_found'] = True
