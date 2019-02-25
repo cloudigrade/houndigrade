@@ -1,26 +1,28 @@
 #!/usr/bin/env sh
 
-losetup -D
-losetup -P /dev/loop7 /dev/rh_release_disk
-losetup -P /dev/loop8 /dev/nrh_disk
-losetup -P /dev/loop9 /dev/2_part_release_nrh_disk
-losetup -P /dev/loop10 /dev/rh_cert_disk
-losetup -P /dev/loop11 /dev/rh_cert_release_disk
-losetup -P /dev/loop12 /dev/rh_repo_disk
-losetup -P /dev/loop13 /dev/rh_rpm_db_disk
-losetup -P /dev/loop14 /dev/bad_yum_conf
+if [ "$(ls /test-data/disks/ | wc -l)" == "0" ];
+then
+    echo "No test data disks found. Does the submodule exist?"
+    echo "Try these commands:"
+    echo "    git submodule sync --recursive"
+    echo "    git submodule update --init --recursive"
+    exit 1
+fi
 
-scl enable rh-python36 'python cli.py \
-    -t ami-rh-release-ami /dev/loop7 \
-    -t ami-centosami /dev/loop8 \
-    -t ami-2-part-release-nrh /dev/loop9 \
-    -t ami-cert /dev/loop10 \
-    -t ami-cert-release /dev/loop11 \
-    -t ami-repo /dev/loop12 \
-    -t ami-rpm-db /dev/loop13 \
-    -t ami-bad-yum-conf /dev/loop14 \
-    -t ami-not-a-mount /dev/null \
-    -t ami-invalid-path /po/ta/toes \
-    '
+for DISK in /test-data/disks/*;
+do
+    echo "####################################"
+    echo "# Inspection for disk file: ${DISK}"
+    DISK_NAME=$(echo "${DISK}" | grep -o '[^/]*$')
+    losetup -D
+    losetup -P /dev/loop10 "${DISK}"
+    scl enable rh-python36 "python cli.py -t 'ami-${DISK_NAME}' /dev/loop10"
+    losetup -D
+done
 
-losetup -D
+for DISK in /dev/null /po/ta/toes;
+do
+    echo "####################################"
+    echo "# Inspection for invalid device: ${DISK}"
+    scl enable rh-python36 "python cli.py -t 'ami-${DISK}' /dev/loop10"
+done
