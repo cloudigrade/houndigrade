@@ -289,7 +289,7 @@ def check_release_files(partition, results):
             results['release_files'] = release_files
         except Exception as e:
             message = _(
-                'Error reading release files on {}: {}'
+                'Error reading release files on {0}: {1}'
             ).format(partition, e)
             click.echo(message, err=True)
             exception_messages.append(message)
