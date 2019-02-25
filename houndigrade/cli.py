@@ -425,11 +425,11 @@ def find_yum_repos_via_config(partition):
             repo_file_dir = '{}{}'.format(INSPECT_PATH,
                                           parser['main']['reposdir'])
     else:
-        click.echo(_('No yum.conf file found on : {}'.format(partition)))
+        click.echo(_('No yum.conf file found on : {}').format(partition))
     # now get all of the .repo files within
     repo_files = glob.glob('{}/*.repo'.format(repo_file_dir))
     if not repo_files:
-        click.echo(_('No .repo files found on : {}'.format(partition)))
+        click.echo(_('No .repo files found on : {}').format(partition))
     # it is also possible to list repos inside of the yum.conf file so we
     # want to add it to the list of files to check if it exists
     if yum_config_path:
