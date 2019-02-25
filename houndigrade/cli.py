@@ -84,7 +84,9 @@ def mount_and_inspect(drive, image_id, results, debug):
     click.echo(_('Checking drive {}').format(drive))
 
     if not os.path.exists(drive):
-        message = _('Nothing found at path {} for {}').format(drive, image_id)
+        message = _(
+            'Nothing found at path {0} for {1}'
+        ).format(drive, image_id)
         click.echo(message, err=True)
         results['errors'].append(message)
         return
@@ -142,7 +144,7 @@ def mount_and_inspect(drive, image_id, results, debug):
 
         except subprocess.CalledProcessError as e:
             message = _(
-                'Mount of {} on image {} failed with error: {}'
+                'Mount of {0} on image {1} failed with error: {2}'
             ).format(partition, image_id, e.stderr),
             click.echo(message, err=True)
             results['images'][image_id][drive][partition]['error'] = e.stderr
