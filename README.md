@@ -56,7 +56,7 @@ Finally, if you need to install a dev only dependency, use:
 
 ### Running
 
-Before running, you must have the following environment variables set so houndigrade can talk to Amazon SQS to share its results:
+Before running, you must have set and exported the following environment variables so houndigrade can talk to Amazon SQS to share its results:
 
     - `QUEUE_CONNECTION_URL`
     - `AWS_SQS_QUEUE_NAME_PREFIX`
@@ -74,15 +74,38 @@ print('sqs://{}:{}@'.format(
 ))
 ```
 
-To run houndigrade locally, follow these steps:
-1. Create a folder called test-disks ie. `mkdir ./test-disks`
-2. Download all of the block devices found [here](https://drive.google.com/open?id=1xvxnmqJ6H9UF7iE5bN2twat01F8FwsaD)
-3. Move the downloaded block devices to test-disks.
-4. Now use docker-compose: `docker-compose up`
+To run houndigrade locally against minimal test disk images, follow these steps:
 
-This will start the houndigrade container, mount provided block
-devices inside said container, and run a scan against it, placing the results
- on the queue. The queue can be accessed at [localhost:15672](http://localhost:15672) with `guest/guest` being the default credentials.
+1. Sync and update the submodule for the `test-data` directory:
+    ```
+    git submodule sync --recursive
+    git submodule update --init --recursive --force
+    ```
+2. Verify that the submodule was populated:
+    ```
+    ls -l ./test-data/disks/
+    ```
+3. Use `docker-compose` to run houndigrade locally with the test data:
+    ```
+    docker-compose up --build --no-cache
+    ```
+    This will mount `test-data` as a shared directory volume, create loop devices for each disk, and perform houndigrade's inspection for each device. houndigrade should put a message on the configured queue for each inspection, and its console output should produce something like during operation:
+    ```
+    ...
+    app_1  | ####################################
+    app_1  | # Inspection for disk file: /test-data/disks/centos_release
+    app_1  | Provided cloud: aws
+    app_1  | Provided drive(s) to inspect: (('ami-centos_release', '/dev/loop10'),)
+    app_1  | Checking drive /dev/loop10
+    app_1  | Checking partition /dev/loop10p1
+    app_1  | RHEL not found via release file on: /dev/loop10p1
+    app_1  | RHEL not found via product certificate on: /dev/loop10p1
+    ...
+    ```
+4. After `docker-compose` completes, force update the submodule because `docker-compose` has a tendency to touch the disk files despite mounting the volume as read-only.
+    ```
+    git submodule update --init --recursive --force
+    ```
 
 ### Testing
 

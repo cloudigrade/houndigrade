@@ -5,7 +5,7 @@ then
     echo "No test data disks found. Does the submodule exist?"
     echo "Try these commands:"
     echo "    git submodule sync --recursive"
-    echo "    git submodule update --init --recursive"
+    echo "    git submodule update --init --recursive --force"
     exit 1
 fi
 
