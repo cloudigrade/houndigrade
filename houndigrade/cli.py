@@ -16,6 +16,7 @@ from raven import Client
 INSPECT_PATH = '/mnt/inspect'
 RHEL_FOUND = 'rhel_found'
 RHEL_PEMS = ['69.pem']
+CERT_PATHS = ['/etc/pki/product/', '/etc/pki/product-default/']
 RHEL_REPOS = ['rhel', 'red hat']
 RH_KEY_IDS = ['199e2f91fd431d51',
               '5326810137017186',
@@ -232,7 +233,14 @@ def check_for_rhel_certs(partition, results):
         writing our results.
 
     """
-    pem_paths = glob.glob('{}/etc/pki/product/*'.format(INSPECT_PATH))
+    pem_paths = []
+    for path in CERT_PATHS:
+        pem_paths = pem_paths + glob.glob(
+            '{inspection_path}{pem_path}*'.format(
+                inspection_path=INSPECT_PATH,
+                pem_path=path)
+        )
+
     pem_files = [(os.path.basename(os.path.normpath(pem)), pem)
                  for pem in pem_paths]
     matching_pems = [pem[1] for pem in pem_files if pem[0] in RHEL_PEMS]

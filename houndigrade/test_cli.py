@@ -809,6 +809,74 @@ class TestCLI(TestCase):
     @patch('cli.glob.glob')
     @patch('cli.subprocess.run')
     @patch('cli.subprocess.check_output')
+    def test_rhel_found_via_product_cert_secondary_location(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob,
+                                         mock_report_results):
+        cloud = 'aws'
+        image_id = 'ami-123456789'
+        drive_path = './dev/xvdf'
+        no_packages_result = '0\n'
+
+        def mock_glob_side_effect(pattern):
+            if 'etc/*-release' in pattern:
+                return []
+            elif '/etc/pki/product-default/*' in pattern:
+                return ['./dev/xvdf/xvdf1/etc/pki/product-default/69.pem',
+                        './dev/xvdf/xvdf2/etc/pki/product-default/185.pem', ]
+            elif '/etc/yum.conf' in pattern:
+                return []
+            elif '/*.repo' in pattern:
+                return []
+            elif '/var/lib/rpm/*' in pattern:
+                return ['__db.001']
+            else:
+                return ['./dev/xvdf1', './dev/xvdf2', ]
+
+        mock_glob_glob.side_effect = mock_glob_side_effect
+        mock_subprocess_check_output.side_effect = [no_packages_result, no_packages_result]
+
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            pathlib.Path('{}/xvdf1'.format(drive_path)).mkdir(parents=True,
+                                                              exist_ok=True)
+            result = runner.invoke(main,
+                                   ['-c', cloud, '--debug', '-t', image_id,
+                                    drive_path])
+
+        self.assertTrue(mock_subprocess_run.called)
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf1'))),
+            result.output)
+        self.assertIn(
+            '"status": "{}"'.format(
+                _('No release files found on {}'.format('./dev/xvdf2'))),
+            result.output)
+        self.assertIn('RHEL found on: ami-1234567', result.output)
+        self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via enabled repos on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL found via product certificate on: ./dev/xvdf1', result.output)
+        self.assertIn('RHEL not found via signed packages on: ./dev/xvdf2', result.output)
+        self.assertIn('RHEL found via product certificate on: ./dev/xvdf2', result.output)
+
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIn('cloud', results)
+        self.assertIn('images', results)
+        self.assertIn('errors', results)
+        self.assertIn(image_id, results['images'])
+        self.assertTrue(results['images'][image_id]['rhel_found'])
+        self.assertFalse(results['images'][image_id]['rhel_signed_packages_found'])
+        self.assertFalse(results['images'][image_id]['rhel_enabled_repos_found'])
+        self.assertTrue(results['images'][image_id]['rhel_product_certs_found'])
+        self.assertFalse(results['images'][image_id]['rhel_release_files_found'])
+
+    @patch('cli.report_results')
+    @patch('cli.glob.glob')
+    @patch('cli.subprocess.run')
+    @patch('cli.subprocess.check_output')
     def test_rhel_found_via_release_file(self, mock_subprocess_check_output, mock_subprocess_run, mock_glob_glob, mock_report_results):
         cloud = 'aws'
         image_id = 'ami-123456789'
