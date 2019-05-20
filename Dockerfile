@@ -1,21 +1,22 @@
-FROM centos:7
+FROM fedora:29
 
 ENV LANG=en_US.utf8
 
-RUN mkdir -p /mnt/inspect
-
-RUN yum install centos-release-scl -y \
-    && yum-config-manager --enable centos-sclo-rh-testing \
-    && yum install which rh-python36 rh-python36-python-pip libcurl-devel gcc -y
-
 COPY Pipfile .
 COPY Pipfile.lock .
-RUN PYCURL_SSL_LIBRARY=nss scl enable rh-python36 'pip install pipenv \
+
+RUN dnf update -y \
+    && dnf install which -y \
+    && if [ ! -e /usr/bin/pip ]; then ln -s /usr/bin/pip3.7 /usr/bin/pip ; fi \
+    && if [[ ! -e /usr/bin/python ]]; then ln -sf /usr/bin/python3.7 /usr/bin/python; fi \
+    && pip install pipenv \
     && pipenv install --system \
-    && rm -rf Pipfile*'
+    && dnf clean all \
+    && rm -rf /var/cache/dnf \
+    && mkdir -p /mnt/inspect
 
 WORKDIR /opt/houndigrade
 COPY houndigrade/cli.py .
 
-ENTRYPOINT ["scl", "enable", "rh-python36", "--", "python", "cli.py"]
+ENTRYPOINT ["python", "cli.py"]
 CMD ["--help"]

@@ -119,7 +119,7 @@ To run just our code-quality checking commands:
 
 To run just our tests:
 
-    tox -e py36
+    tox -e py37
 
 If you wish to run a higher-level suite of integration tests, see
 [integrade](https://github.com/cloudigrade/integrade).
