@@ -12,6 +12,15 @@ raven = "*"
 [dev-packages]
 nose = "*"
 coverage = "*"
+black = "*"
+flake8-black = "*"
+flake8-import-order = "*"
+flake8-docstrings = "*"
+# Pin pydocstyle<4 until https://gitlab.com/pycqa/flake8-docstrings/issues/36 is resolved.
+pydocstyle = "<4"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true
