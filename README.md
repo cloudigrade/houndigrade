@@ -87,7 +87,11 @@ To run houndigrade locally against minimal test disk images, follow these steps:
     ```
 3. Use `docker-compose` to run houndigrade locally with the test data:
     ```
-    docker-compose up --build --no-cache
+    docker-compose build --no-cache && docker-compose up --force-recreate
+    ```
+    or if you want to build and run over cached images:
+    ```
+    docker-compose up --build --force-recreate
     ```
     This will mount `test-data` as a shared directory volume, create loop devices for each disk, and perform houndigrade's inspection for each device. houndigrade should put a message on the configured queue for each inspection, and its console output should produce something like during operation:
     ```
