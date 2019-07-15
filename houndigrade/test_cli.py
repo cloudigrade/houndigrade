@@ -48,6 +48,8 @@ class TestCLI(TestCase):
                     "./dev/xvdf/xvdf2/etc/centos-release",
                     "./dev/xvdf/xvdf2/etc/os-release",
                 ]
+            elif "/etc/os-release" in pattern:
+                return ["./dev/xvdf/xvdf1/etc/os-release"]
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/pki/product/69.pem"]
             elif "/etc/yum.conf" in pattern:
@@ -119,7 +121,7 @@ class TestCLI(TestCase):
             "RHEL found via product certificate on: ./dev/xvdf2", result.output
         )
         self.assertIn("RHEL found via release file on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version 7.4) found on: ami-1234567", result.output)
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -144,6 +146,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
+        self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
 
     @patch("cli.report_results")
     @patch("cli.subprocess.run")
@@ -201,6 +204,8 @@ class TestCLI(TestCase):
                     "./dev/xvdf/xvdf2/etc/centos-release",
                     "./dev/xvdf/xvdf2/etc/os-release",
                 ]
+            elif "/etc/os-release" in pattern:
+                return []
             elif "/etc/yum.conf" in pattern:
                 return []
             elif "/*.repo" in pattern:
@@ -236,6 +241,7 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertIn(image_id, results["images"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -256,6 +262,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -303,6 +311,7 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertIn(image_id, results["images"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -324,6 +333,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -419,6 +430,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -439,6 +451,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -489,7 +503,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn(
@@ -528,6 +542,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -548,6 +563,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -591,7 +608,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn(
@@ -626,6 +643,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -646,6 +664,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -689,7 +709,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn(
@@ -724,6 +744,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -744,6 +765,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return []
@@ -801,6 +824,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -822,6 +846,8 @@ class TestCLI(TestCase):
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/potato-release"]
+            elif "/etc/os-release" in pattern:
+                return []
             elif "/etc/pki/product/*" in pattern:
                 return []
             elif "/etc/yum.conf" in pattern:
@@ -879,6 +905,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
         self.assertEqual(
             (
                 "Error reading release files on ./dev/xvdf1: "
@@ -909,6 +936,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -951,7 +980,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("No yum.conf file found on : ./dev/xvdf1", result.output)
         self.assertIn("No .repo files found on : ./dev/xvdf1", result.output)
@@ -980,6 +1009,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1000,6 +1030,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return [
@@ -1045,7 +1077,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn(
@@ -1072,6 +1104,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1092,6 +1125,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product-default/*" in pattern:
                 return [
@@ -1137,7 +1172,7 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn(
@@ -1164,6 +1199,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1190,6 +1226,8 @@ class TestCLI(TestCase):
                     "./dev/xvdf/xvdf2/etc/centos-release",
                     "./dev/xvdf/xvdf2/etc/os-release",
                 ]
+            elif "/etc/os-release" in pattern:
+                return ["./dev/xvdf/xvdf1/etc/os-release"]
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
@@ -1217,7 +1255,7 @@ class TestCLI(TestCase):
 
         self.assertTrue(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("RHEL found on: ami-1234567", result.output)
+        self.assertIn("RHEL (version 7.4) found on: ami-1234567", result.output)
         self.assertIn("RHEL found via release file on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn(
@@ -1248,6 +1286,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
+        self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1262,6 +1301,8 @@ class TestCLI(TestCase):
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
+                return []
+            elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return []
@@ -1300,6 +1341,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
+        self.assertIsNone(results["images"][image_id]["rhel_version"])
         self.assertEqual(
             _("RPM DB directory on {0} has no data for {1}").format(
                 "./dev/xvdf1", image_id

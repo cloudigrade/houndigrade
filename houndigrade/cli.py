@@ -98,6 +98,7 @@ def mount_and_inspect(drive, image_id, results, debug):
     results["images"][image_id]["rhel_product_certs_found"] = False
     results["images"][image_id]["rhel_release_files_found"] = False
     results["images"][image_id]["rhel_enabled_repos_found"] = False
+    results["images"][image_id]["rhel_version"] = None
     results["images"][image_id][drive] = {}
 
     for partition in get_partitions(drive):
@@ -124,12 +125,19 @@ def mount_and_inspect(drive, image_id, results, debug):
                     partition, rhel_signed_packages, image_id, debug
                 )
 
+                os_version = get_os_version(partition)
+                partition_result["facts"]["os_version"] = os_version
+
                 rhel_found = (
                     rhel_release_files[RHEL_FOUND]
                     or rhel_product_certs[RHEL_FOUND]
                     or rhel_enabled_repos[RHEL_FOUND]
                     or rhel_signed_packages[RHEL_FOUND]
                 )
+
+                if rhel_found and os_version:
+                    # Note: If multiple partitions, the last one found is set.
+                    results["images"][image_id]["rhel_version"] = os_version
 
                 results["images"][image_id][RHEL_FOUND] |= rhel_found
                 results["images"][image_id][
@@ -146,7 +154,11 @@ def mount_and_inspect(drive, image_id, results, debug):
                 ] |= rhel_enabled_repos[RHEL_FOUND]
 
                 if rhel_found:
-                    click.echo(_("RHEL found on: {}").format(image_id))
+                    click.echo(
+                        _("RHEL (version {os_version}) found on: {image_id}").format(
+                            os_version=os_version, image_id=image_id
+                        )
+                    )
                 else:
                     click.echo(_("RHEL not found on: {}").format(image_id))
 
@@ -409,6 +421,29 @@ def check_file(file_path):
     except FileNotFoundError as e:
         click.echo("{}".format(e))
         return False, None
+
+
+def get_os_version(partition):
+    """
+    Get the OS version if present.
+
+    Returns:
+        str containing the version or None if not found or empty.
+
+    """
+    os_release_file_path = glob.glob("{}/etc/os-release".format(INSPECT_PATH))
+    if os_release_file_path:
+        try:
+            with open(os_release_file_path[0]) as f:
+                for line in f:
+                    if line.startswith("VERSION_ID="):
+                        version = line[11:].strip().strip('"')
+                        return version if version else None
+        except Exception as e:
+            click.echo("{}".format(e))
+    else:
+        click.echo(_("No os-release file found on: {}").format(partition))
+    return None
 
 
 def find_yum_repos_via_config(partition):
