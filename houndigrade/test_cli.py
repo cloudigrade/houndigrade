@@ -982,8 +982,8 @@ class TestCLI(TestCase):
         )
         self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("No yum.conf file found on : ./dev/xvdf1", result.output)
-        self.assertIn("No .repo files found on : ./dev/xvdf1", result.output)
+        self.assertIn("No yum.conf file found on: ./dev/xvdf1", result.output)
+        self.assertIn("No .repo files found on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
         self.assertIn("RHEL found via signed packages on: ./dev/xvdf1", result.output)
         self.assertIn(
@@ -995,8 +995,8 @@ class TestCLI(TestCase):
         self.assertIn(
             "RHEL not found via product certificate on: ./dev/xvdf2", result.output
         )
-        self.assertIn("No yum.conf file found on : ./dev/xvdf2", result.output)
-        self.assertIn("No .repo files found on : ./dev/xvdf2", result.output)
+        self.assertIn("No yum.conf file found on: ./dev/xvdf2", result.output)
+        self.assertIn("No .repo files found on: ./dev/xvdf2", result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
