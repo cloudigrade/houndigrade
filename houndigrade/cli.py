@@ -164,10 +164,11 @@ def mount_and_inspect(drive, image_id, results, debug):
 
         except subprocess.CalledProcessError as e:
             message = (
-                _("Mount of {0} on image {1} failed with error: {2}").format(
-                    partition, image_id, e.stderr
-                ),
+                _("Mount of {0} on image {1} failed with error: {2}")
+                .format(partition, image_id, e.stderr)
+                .strip()
             )
+
             click.echo(message, err=True)
             results["images"][image_id][drive][partition]["error"] = e.stderr
             results["errors"].append(message)
