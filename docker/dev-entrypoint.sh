@@ -16,7 +16,7 @@ do
     DISK_NAME=$(echo "${DISK}" | grep -o '[^/]*$')
     losetup -D
     losetup -P /dev/loop10 "${DISK}"
-    scl enable rh-python36 "python cli.py -t 'ami-${DISK_NAME}' /dev/loop10"
+    python cli.py -t "ami-${DISK_NAME}" /dev/loop10
     losetup -D
 done
 
@@ -24,5 +24,5 @@ for DISK in /dev/null /po/ta/toes;
 do
     echo "####################################"
     echo "# Inspection for invalid device: ${DISK}"
-    scl enable rh-python36 "python cli.py -t 'ami-${DISK}' /dev/loop10"
+    python cli.py -t "ami-${DISK}" /dev/loop10
 done
