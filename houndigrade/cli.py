@@ -99,6 +99,7 @@ def mount_and_inspect(drive, image_id, results, debug):
     results["images"][image_id]["rhel_release_files_found"] = False
     results["images"][image_id]["rhel_enabled_repos_found"] = False
     results["images"][image_id]["rhel_version"] = None
+    results["images"][image_id]["syspurpose"] = None
     results["images"][image_id][drive] = {}
 
     for partition in get_partitions(drive):
@@ -128,6 +129,9 @@ def mount_and_inspect(drive, image_id, results, debug):
                 os_version = get_os_version(partition)
                 partition_result["facts"]["os_version"] = os_version
 
+                syspurpose = get_syspurpose(partition)
+                partition_result["facts"]["syspurpose_contents"] = syspurpose
+
                 rhel_found = (
                     rhel_release_files[RHEL_FOUND]
                     or rhel_product_certs[RHEL_FOUND]
@@ -138,6 +142,13 @@ def mount_and_inspect(drive, image_id, results, debug):
                 if rhel_found and os_version:
                     # Note: If multiple partitions, the last one found is set.
                     results["images"][image_id]["rhel_version"] = os_version
+
+                if rhel_found and syspurpose:
+                    syspurpose_parsed = parse_syspurpose(syspurpose, partition)
+                    if syspurpose_parsed:
+                        # Set the syspurpose only if the content parsed successfully.
+                        # Note: If multiple partitions, the last one found is set.
+                        results["images"][image_id]["syspurpose"] = syspurpose_parsed
 
                 results["images"][image_id][RHEL_FOUND] |= rhel_found
                 results["images"][image_id][
@@ -444,6 +455,51 @@ def get_os_version(partition):
             click.echo("{}".format(e))
     else:
         click.echo(_("No os-release file found on: {}").format(partition))
+    return None
+
+
+def get_syspurpose(partition):
+    """
+    Get the syspurpose.json (system purpose) file contents if present.
+
+    Returns:
+         str containing the contents of syspurpose.json or None if not found or empty.
+
+    """
+    syspurpose_file_path = glob.glob(
+        "{}/etc/rhsm/syspurpose/syspurpose.json".format(INSPECT_PATH)
+    )
+    if syspurpose_file_path:
+        try:
+            with open(syspurpose_file_path[0]) as f:
+                file_contents = f.read()
+            return file_contents if file_contents else None
+        except Exception as e:
+            click.echo("{}".format(e))
+    else:
+        click.echo(_("No syspurpose.json file found on: {}").format(partition))
+    return None
+
+
+def parse_syspurpose(syspurpose, partition):
+    """
+    Parse the system purpose file's contents.
+
+    Returns:
+         object representation of the parsed contents or None if or empty.
+
+    """
+    if syspurpose and syspurpose.strip():
+        try:
+            return json.loads(syspurpose)
+        except Exception as e:
+            click.echo(
+                _("Parsing system purpose on {0} failed because: {1}").format(
+                    partition, str(e)
+                )
+            )
+    else:
+        click.echo(_("System purpose is empty on: {}").format(partition))
     return None
 
 

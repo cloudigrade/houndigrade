@@ -50,6 +50,8 @@ class TestCLI(TestCase):
                 ]
             elif "/etc/os-release" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/os-release"]
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
+                return ["./dev/xvdf/xvdf1/etc/rhsm/syspurpose/syspurpose.json"]
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/pki/product/69.pem"]
             elif "/etc/yum.conf" in pattern:
@@ -134,6 +136,7 @@ class TestCLI(TestCase):
             '{"repo": "rhel7-cdn-internal-optional", "name": "RHEL 7 - $basearch"}',
             result.output,
         )
+        self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -147,6 +150,10 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
         self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
+        self.assertEqual(
+            results["images"][image_id]["syspurpose"]["role"],
+            "Red Hat Enterprise Linux Server",
+        )
 
     @patch("cli.report_results")
     @patch("cli.subprocess.run")
@@ -206,6 +213,8 @@ class TestCLI(TestCase):
                 ]
             elif "/etc/os-release" in pattern:
                 return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
+                return []
             elif "/etc/yum.conf" in pattern:
                 return []
             elif "/*.repo" in pattern:
@@ -242,6 +251,7 @@ class TestCLI(TestCase):
         self.assertIn("errors", results)
         self.assertIn(image_id, results["images"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -264,6 +274,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -312,6 +324,7 @@ class TestCLI(TestCase):
         self.assertIn("errors", results)
         self.assertIn(image_id, results["images"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -335,6 +348,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -431,6 +446,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -453,6 +469,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -543,6 +561,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -565,6 +584,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -644,6 +665,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -666,6 +688,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -745,6 +769,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -767,6 +792,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return []
@@ -825,6 +852,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -847,6 +875,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/potato-release"]
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return []
@@ -906,6 +936,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
         self.assertEqual(
             (
                 "Error reading release files on ./dev/xvdf1: "
@@ -938,6 +969,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
@@ -1010,6 +1043,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1032,6 +1066,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return [
@@ -1105,6 +1141,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1127,6 +1164,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product-default/*" in pattern:
                 return [
@@ -1200,6 +1239,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1228,6 +1268,8 @@ class TestCLI(TestCase):
                 ]
             elif "/etc/os-release" in pattern:
                 return ["./dev/xvdf/xvdf1/etc/os-release"]
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
+                return ["./dev/xvdf/xvdf1/etc/rhsm/syspurpose/syspurpose.json"]
             elif "/etc/pki/product/*" in pattern:
                 return ["./dev/xvdf/xvdf2/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
@@ -1274,6 +1316,7 @@ class TestCLI(TestCase):
             "RHEL not found via product certificate on: ./dev/xvdf2", result.output
         )
         self.assertIn("RHEL found via release file on: ./dev/xvdf2", result.output)
+        self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -1287,6 +1330,10 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
         self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
+        self.assertEqual(
+            results["images"][image_id]["syspurpose"]["role"],
+            "Red Hat Enterprise Linux Server",
+        )
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -1303,6 +1350,8 @@ class TestCLI(TestCase):
             if "etc/*-release" in pattern:
                 return []
             elif "/etc/os-release" in pattern:
+                return []
+            elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return []
@@ -1342,6 +1391,7 @@ class TestCLI(TestCase):
         self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
         self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
         self.assertIsNone(results["images"][image_id]["rhel_version"])
+        self.assertIsNone(results["images"][image_id]["syspurpose"])
         self.assertEqual(
             _("RPM DB directory on {0} has no data for {1}").format(
                 "./dev/xvdf1", image_id
@@ -1395,7 +1445,7 @@ class TestCLI(TestCase):
     @staticmethod
     def prep_fs(drive_path):
         """Prepare a filesystem directory for testing."""
-        pathlib.Path("{}/xvdf1/etc".format(drive_path)).mkdir(
+        pathlib.Path("{}/xvdf1/etc/rhsm/syspurpose".format(drive_path)).mkdir(
             parents=True, exist_ok=True
         )
         pathlib.Path("{}/xvdf2/etc".format(drive_path)).mkdir(
@@ -1445,10 +1495,23 @@ class TestCLI(TestCase):
 
             """
 
+        rh_syspurpose = """\
+            {
+              "role": "Red Hat Enterprise Linux Server",
+              "service_level_agreement": "Premium",
+              "usage": "Development/Test"
+            }
+
+            """
+
         with open("{}/xvdf1/etc/redhat-release".format(drive_path), "w") as f:
             f.write(redhat_release)
         with open("{}/xvdf1/etc/os-release".format(drive_path), "w") as f:
             f.write(dedent(rh_os_release))
+        with open(
+            "{}/xvdf1/etc/rhsm/syspurpose/syspurpose.json".format(drive_path), "w"
+        ) as f:
+            f.write(dedent(rh_syspurpose))
 
         with open("{}/xvdf2/etc/centos-release".format(drive_path), "w") as f:
             f.write(centos_release)
