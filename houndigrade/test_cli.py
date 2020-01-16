@@ -1073,6 +1073,7 @@ class TestCLI(TestCase):
                 return [
                     "./dev/xvdf/xvdf1/etc/pki/product/69.pem",
                     "./dev/xvdf/xvdf2/etc/pki/product/185.pem",
+                    "./dev/xvdf/xvdf3/etc/pki/product/479.pem",
                 ]
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -1081,10 +1082,11 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return ["./dev/xvdf1", "./dev/xvdf2"]
+                return ["./dev/xvdf1", "./dev/xvdf2", "./dev/xvdf3"]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
+            no_packages_result,
             no_packages_result,
             no_packages_result,
         ]
@@ -1116,6 +1118,7 @@ class TestCLI(TestCase):
         self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
+        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf3", result.output)
         self.assertIn(
             "RHEL not found via signed packages on: ./dev/xvdf1", result.output
         )
@@ -1128,7 +1131,9 @@ class TestCLI(TestCase):
         self.assertIn(
             "RHEL found via product certificate on: ./dev/xvdf2", result.output
         )
-
+        self.assertIn(
+            "RHEL found via product certificate on: ./dev/xvdf3", result.output
+        )
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1171,6 +1176,7 @@ class TestCLI(TestCase):
                 return [
                     "./dev/xvdf/xvdf1/etc/pki/product-default/69.pem",
                     "./dev/xvdf/xvdf2/etc/pki/product-default/185.pem",
+                    "./dev/xvdf/xvdf3/etc/pki/product-default/479.pem",
                 ]
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -1179,10 +1185,11 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return ["./dev/xvdf1", "./dev/xvdf2"]
+                return ["./dev/xvdf1", "./dev/xvdf2", "./dev/xvdf3"]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
+            no_packages_result,
             no_packages_result,
             no_packages_result,
         ]
@@ -1211,9 +1218,16 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
+        self.assertIn(
+            '"status": "{}"'.format(
+                _("No release files found on {}".format("./dev/xvdf3"))
+            ),
+            result.output,
+        )
         self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
+        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf3", result.output)
         self.assertIn(
             "RHEL not found via signed packages on: ./dev/xvdf1", result.output
         )
@@ -1226,7 +1240,12 @@ class TestCLI(TestCase):
         self.assertIn(
             "RHEL found via product certificate on: ./dev/xvdf2", result.output
         )
-
+        self.assertIn(
+            "RHEL not found via signed packages on: ./dev/xvdf3", result.output
+        )
+        self.assertIn(
+            "RHEL found via product certificate on: ./dev/xvdf3", result.output
+        )
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)

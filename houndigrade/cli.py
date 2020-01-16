@@ -15,7 +15,7 @@ from raven import Client
 
 INSPECT_PATH = "/mnt/inspect"
 RHEL_FOUND = "rhel_found"
-RHEL_PEMS = ["69.pem"]
+RHEL_PEMS = ["69.pem", "479.pem"]
 CERT_PATHS = ["/etc/pki/product/", "/etc/pki/product-default/"]
 RHEL_REPOS = ["rhel", "red hat"]
 RH_KEY_IDS = [
