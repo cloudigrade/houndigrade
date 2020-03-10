@@ -20,7 +20,7 @@ class TestCLI(TestCase):
         result = runner.invoke(main)
 
         self.assertEqual(result.exit_code, 2)
-        self.assertIn('Error: Missing option "--target" / "-t".', result.output)
+        self.assertIn("Error: Missing option '--target' / '-t'.", result.output)
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")

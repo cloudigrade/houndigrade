@@ -14,7 +14,7 @@ Unit Tests:
   stage: test
   image: python:3.7
   before_script:
-    - pip install tox codecov
+    - pip install tox codecov poetry
   script: tox -epy37
   after_script:
     - codecov
@@ -23,7 +23,7 @@ Flake8:
   stage: test
   image: python:3.7
   before_script:
-    - pip install tox
+    - pip install tox poetry
   script: tox -eflake8
 
 Build Image:

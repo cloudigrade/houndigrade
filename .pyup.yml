@@ -5,5 +5,5 @@ search: True
 requirements:
   - tox.ini:
       pin: False
-  - Pipfile
-  - Pipfile.lock
+  - poetry.lock
+  - pyproject.toml

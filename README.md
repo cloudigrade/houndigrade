@@ -21,10 +21,10 @@ Install [homebrew](https://brew.sh/):
 
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
-Use homebrew to install modern Python, pipenv, and gettext:
+Use homebrew to install modern Python and gettext:
 
     brew update
-    brew install python pipenv gettext
+    brew install python gettext
     brew link gettext --force
 
 Get into the houndigrade project code:
@@ -36,20 +36,21 @@ Get into the houndigrade project code:
 
 All of houndigrade's dependencies should be stored in a virtual environment.
 These instructions assume it is acceptable for you to use
-[pipenv](https://docs.pipenv.org), but if you wish
+[poetry](https://python-poetry.org/docs/), but if you wish
 to use another technology, that's your prerogative!
 
 To create a virtualenv and install the project dependencies run:
 
-    pipenv install --dev
+    pip install poetry
+    poetry install
 
 If you need to add a dependancy to the project use:
 
-    pipenv install <dependency-name>
+    poetry add <dependency-name>
 
 Finally, if you need to install a dev only dependency, use:
 
-    pipenv install --dev <dependecy-name>
+    poetry add --dev <dependecy-name>
 
 
 ## Common commands
