@@ -12,16 +12,16 @@ variables:
 ### TEST STAGE ###
 Unit Tests:
   stage: test
-  image: python:3.7
+  image: python:3.8
   before_script:
     - pip install tox codecov poetry
-  script: tox -epy37
+  script: tox -epy38
   after_script:
     - codecov
 
 Flake8:
   stage: test
-  image: python:3.7
+  image: python:3.8
   before_script:
     - pip install tox poetry
   script: tox -eflake8
