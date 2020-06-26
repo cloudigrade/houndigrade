@@ -3,6 +3,11 @@ stages:
   - test
   - build
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+
 ### GLOBAL VARS ###
 variables:
   IMAGE_NAME: registry.gitlab.com/${CI_PROJECT_PATH}
@@ -28,9 +33,10 @@ Flake8:
 
 Build Image:
   stage: test
-  except:
-    - master
-    - tags
+  rules:
+    - if: $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
+    - when: on_success
   image: docker
   services:
     - docker:dind
@@ -44,10 +50,11 @@ Build and Push Image:
   image: docker:stable
   services:
     - docker:dind
-  only:
-    - master@cloudigrade/houndigrade
-  except:
-    - tags@cloudigrade/houndigrade
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
   before_script:
     - docker login -u gitlab-ci-token -p ${CI_JOB_TOKEN} registry.gitlab.com
   script:
@@ -61,8 +68,9 @@ Build and Push Tagged Image:
   image: docker:stable
   services:
     - docker:dind
-  only:
-    - tags@cloudigrade/houndigrade
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: on_success
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
   script:
