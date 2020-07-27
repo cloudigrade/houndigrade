@@ -62,6 +62,10 @@ def main(cloud, target, debug):
     click.echo(_("Provided cloud: {}").format(cloud))
     click.echo(_("Provided drive(s) to inspect: {}").format(target))
 
+    if debug:
+        all_devices = os.listdir("/dev/")
+        click.echo(_("/dev/ contains: {}").format(all_devices))
+
     results = {"cloud": cloud, "images": {}, "errors": []}
 
     for image_id, drive in target:
