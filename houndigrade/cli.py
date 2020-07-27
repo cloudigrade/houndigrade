@@ -90,20 +90,24 @@ def mount_and_inspect(drive, image_id, results, debug):
     """
     click.echo(_("Checking drive {}").format(drive))
 
-    results["images"][image_id] = results["images"].get(image_id, {})
-    results["images"][image_id][RHEL_FOUND] = False
-    results["images"][image_id]["rhel_signed_packages_found"] = False
-    results["images"][image_id]["rhel_product_certs_found"] = False
-    results["images"][image_id]["rhel_release_files_found"] = False
-    results["images"][image_id]["rhel_enabled_repos_found"] = False
-    results["images"][image_id]["rhel_version"] = None
-    results["images"][image_id]["syspurpose"] = None
-    results["images"][image_id][drive] = {}
+    if image_id not in results["images"]:
+        results["images"][image_id] = {
+            RHEL_FOUND: False,
+            "rhel_signed_packages_found": False,
+            "rhel_product_certs_found": False,
+            "rhel_release_files_found": False,
+            "rhel_enabled_repos_found": False,
+            "rhel_version": None,
+            "syspurpose": None,
+            drive: {},
+            "errors": [],
+        }
 
     if not os.path.exists(drive):
         message = _("Nothing found at path {0} for {1}").format(drive, image_id)
         click.echo(message, err=True)
         results["errors"].append(message)
+        results["images"][image_id]["errors"].append(message)
         return
 
     for partition in get_partitions(drive):
@@ -195,6 +199,7 @@ def mount_and_inspect(drive, image_id, results, debug):
 
             click.echo(message, err=True)
             results["images"][image_id][drive][partition]["error"] = e.stderr
+            results["images"][image_id]["errors"].append(message)
             results["errors"].append(message)
 
 

@@ -143,7 +143,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertTrue(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -172,6 +174,10 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
+        expected_error_message = _("Nothing found at path {} for {}").format(
+            drive_path, image_id
+        )
+
         self.assertFalse(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
 
@@ -180,6 +186,8 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 1)
+        self.assertIn(expected_error_message, results["errors"])
         self.assertIn(image_id, results["images"])
         image_result = results["images"][image_id]
         self.assertFalse(image_result["rhel_found"])
@@ -189,10 +197,8 @@ class TestCLI(TestCase):
         self.assertFalse(image_result["rhel_enabled_repos_found"])
         self.assertIsNone(image_result["rhel_version"])
         self.assertIsNone(image_result["syspurpose"])
-        self.assertIn(
-            _("Nothing found at path {} for {}").format(drive_path, image_id),
-            results["errors"],
-        )
+        self.assertEqual(len(image_result["errors"]), 1)
+        self.assertIn(expected_error_message, image_result["errors"])
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
@@ -257,7 +263,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertIsNone(results["images"][image_id]["rhel_version"])
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
@@ -330,7 +338,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertIsNone(results["images"][image_id]["rhel_version"])
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
@@ -447,7 +457,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertFalse(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -562,7 +574,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -666,7 +680,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -770,7 +786,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -853,7 +871,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertFalse(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -937,7 +957,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertFalse(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1044,7 +1066,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertTrue(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1147,7 +1171,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1259,7 +1285,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1350,7 +1378,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertTrue(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1411,7 +1441,9 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 0)
         self.assertIn(image_id, results["images"])
+        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
         self.assertFalse(results["images"][image_id]["rhel_found"])
         self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
         self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
@@ -1438,7 +1470,8 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
 
-        e = CalledProcessError(1, "mount", stderr="Mount failed.")
+        error_message = "Mount failed."
+        e = CalledProcessError(1, "mount", stderr=error_message)
 
         mock_subprocess_run.side_effect = e
 
@@ -1460,14 +1493,19 @@ class TestCLI(TestCase):
 
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
+
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
+        self.assertEqual(len(results["errors"]), 1)
+        self.assertIn(error_message, results["errors"][0])
         self.assertIn(image_id, results["images"])
         self.assertEqual(
-            "Mount failed.",
+            error_message,
             results["images"][image_id]["./dev/xvdf"]["./dev/xvdf1"]["error"],
         )
+        self.assertEqual(len(results["images"][image_id]["errors"]), 1)
+        self.assertIn(error_message, results["images"][image_id]["errors"][0])
 
     @staticmethod
     def prep_fs(drive_path):
