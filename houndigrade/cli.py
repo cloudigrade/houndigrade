@@ -103,7 +103,11 @@ def mount_and_inspect(drive, image_id, results, debug):
     results["images"][image_id][drive] = {}
 
     for partition in get_partitions(drive):
-        click.echo(_("Checking partition {}").format(partition))
+        click.echo(
+            _("Checking partition {partition} for image {image_id}").format(
+                partition=partition, image_id=image_id
+            )
+        )
         rhel_release_files = {}
         rhel_product_certs = {}
         rhel_signed_packages = {}
@@ -166,8 +170,13 @@ def mount_and_inspect(drive, image_id, results, debug):
 
                 if rhel_found:
                     click.echo(
-                        _("RHEL (version {os_version}) found on: {image_id}").format(
-                            os_version=os_version, image_id=image_id
+                        _(
+                            "RHEL (version {os_version}) found on: {image_id} "
+                            "in {partition}"
+                        ).format(
+                            os_version=os_version,
+                            image_id=image_id,
+                            partition=partition,
                         )
                     )
                 else:
