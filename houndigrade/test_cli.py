@@ -180,7 +180,15 @@ class TestCLI(TestCase):
         self.assertIn("cloud", results)
         self.assertIn("images", results)
         self.assertIn("errors", results)
-        self.assertNotIn(image_id, results["images"])
+        self.assertIn(image_id, results["images"])
+        image_result = results["images"][image_id]
+        self.assertFalse(image_result["rhel_found"])
+        self.assertFalse(image_result["rhel_signed_packages_found"])
+        self.assertFalse(image_result["rhel_product_certs_found"])
+        self.assertFalse(image_result["rhel_release_files_found"])
+        self.assertFalse(image_result["rhel_enabled_repos_found"])
+        self.assertIsNone(image_result["rhel_version"])
+        self.assertIsNone(image_result["syspurpose"])
         self.assertIn(
             _("Nothing found at path {} for {}").format(drive_path, image_id),
             results["errors"],

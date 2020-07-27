@@ -90,12 +90,6 @@ def mount_and_inspect(drive, image_id, results, debug):
     """
     click.echo(_("Checking drive {}").format(drive))
 
-    if not os.path.exists(drive):
-        message = _("Nothing found at path {0} for {1}").format(drive, image_id)
-        click.echo(message, err=True)
-        results["errors"].append(message)
-        return
-
     results["images"][image_id] = results["images"].get(image_id, {})
     results["images"][image_id][RHEL_FOUND] = False
     results["images"][image_id]["rhel_signed_packages_found"] = False
@@ -105,6 +99,12 @@ def mount_and_inspect(drive, image_id, results, debug):
     results["images"][image_id]["rhel_version"] = None
     results["images"][image_id]["syspurpose"] = None
     results["images"][image_id][drive] = {}
+
+    if not os.path.exists(drive):
+        message = _("Nothing found at path {0} for {1}").format(drive, image_id)
+        click.echo(message, err=True)
+        results["errors"].append(message)
+        return
 
     for partition in get_partitions(drive):
         click.echo(
