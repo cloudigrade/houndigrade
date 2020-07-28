@@ -972,7 +972,7 @@ class TestCLI(TestCase):
                 "Error reading release files on ./dev/xvdf1: "
                 "'utf-8' codec can't decode byte 0xac in position 0: invalid start byte"
             ),
-            results["images"][image_id]["./dev/xvdf"]["./dev/xvdf1"]["facts"][
+            results["images"][image_id]["drives"]["./dev/xvdf"]["./dev/xvdf1"]["facts"][
                 "rhel_release_files"
             ]["status"],
         )
@@ -1455,7 +1455,7 @@ class TestCLI(TestCase):
             _("RPM DB directory on {0} has no data for {1}").format(
                 "./dev/xvdf1", image_id
             ),
-            results["images"][image_id]["./dev/xvdf"]["./dev/xvdf1"]["facts"][
+            results["images"][image_id]["drives"]["./dev/xvdf"]["./dev/xvdf1"]["facts"][
                 "rhel_signed_packages"
             ]["status"],
         )
@@ -1502,7 +1502,7 @@ class TestCLI(TestCase):
         self.assertIn(image_id, results["images"])
         self.assertEqual(
             error_message,
-            results["images"][image_id]["./dev/xvdf"]["./dev/xvdf1"]["error"],
+            results["images"][image_id]["drives"]["./dev/xvdf"]["./dev/xvdf1"]["error"],
         )
         self.assertEqual(len(results["images"][image_id]["errors"]), 1)
         self.assertIn(error_message, results["images"][image_id]["errors"][0])

@@ -99,9 +99,12 @@ def mount_and_inspect(drive, image_id, results, debug):
             "rhel_enabled_repos_found": False,
             "rhel_version": None,
             "syspurpose": None,
-            drive: {},
+            "drives": {},
             "errors": [],
         }
+
+    if drive not in results["images"][image_id]["drives"]:
+        results["images"][image_id]["drives"][drive] = {}
 
     if not os.path.exists(drive):
         message = _("Nothing found at path {0} for {1}").format(drive, image_id)
@@ -128,7 +131,7 @@ def mount_and_inspect(drive, image_id, results, debug):
                 "rhel_enabled_repos": rhel_enabled_repos,
             }
         }
-        results["images"][image_id][drive][partition] = partition_result
+        results["images"][image_id]["drives"][drive][partition] = partition_result
         try:
             with mount(partition, INSPECT_PATH):
                 check_release_files(partition, rhel_release_files)
@@ -198,7 +201,7 @@ def mount_and_inspect(drive, image_id, results, debug):
             )
 
             click.echo(message, err=True)
-            results["images"][image_id][drive][partition]["error"] = e.stderr
+            results["images"][image_id]["drives"][drive][partition]["error"] = e.stderr
             results["images"][image_id]["errors"].append(message)
             results["errors"].append(message)
 
