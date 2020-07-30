@@ -113,7 +113,15 @@ def mount_and_inspect(drive, image_id, results, debug):
         results["images"][image_id]["errors"].append(message)
         return
 
-    for partition in get_partitions(drive):
+    partitions = get_partitions(drive)
+    if not partitions:
+        message = _("No partitions found at {0} for {1}").format(drive, image_id)
+        click.echo(message, err=True)
+        results["errors"].append(message)
+        results["images"][image_id]["errors"].append(message)
+        return
+
+    for partition in partitions:
         click.echo(
             _("Checking partition {partition} for image {image_id}").format(
                 partition=partition, image_id=image_id
