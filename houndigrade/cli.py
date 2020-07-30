@@ -81,6 +81,8 @@ def mount_and_inspect(drive, image_id, results, debug):
     """
     Mount provided drive and inspect it.
 
+    Note: This function updates results and returns nothing.
+
     Args:
         drive (str): The path to the drive to mount.
         image_id (str): The id of the image we're inspecting.
@@ -103,14 +105,16 @@ def mount_and_inspect(drive, image_id, results, debug):
             "errors": [],
         }
 
+    image_results = results["images"][image_id]
+
     if drive not in results["images"][image_id]["drives"]:
-        results["images"][image_id]["drives"][drive] = {}
+        image_results["drives"][drive] = {}
 
     if not os.path.exists(drive):
         message = _("Nothing found at path {0} for {1}").format(drive, image_id)
         click.echo(message, err=True)
         results["errors"].append(message)
-        results["images"][image_id]["errors"].append(message)
+        image_results["errors"].append(message)
         return
 
     partitions = get_partitions(drive)
@@ -118,100 +122,109 @@ def mount_and_inspect(drive, image_id, results, debug):
         message = _("No partitions found at {0} for {1}").format(drive, image_id)
         click.echo(message, err=True)
         results["errors"].append(message)
-        results["images"][image_id]["errors"].append(message)
+        image_results["errors"].append(message)
         return
 
     for partition in partitions:
-        click.echo(
-            _("Checking partition {partition} for image {image_id}").format(
-                partition=partition, image_id=image_id
-            )
+        check_partition(drive, partition, image_id, results, debug)
+
+
+def check_partition(drive, partition, image_id, results, debug):
+    """
+    Check the partition.
+
+    Note: This function updates results and returns nothing.
+
+    Args:
+        drive (str): The path to the mounted drive.
+        partition (str): The partition mounted from the drive.
+        image_id (str): The id of the image we're inspecting.
+        results (dict): The results of the inspection.
+        debug (bool): Boolean regarding whether or not we are in debug mode.
+
+    """
+    image_results = results["images"][image_id]
+
+    click.echo(
+        _("Checking partition {partition} for image {image_id}").format(
+            partition=partition, image_id=image_id
         )
-        rhel_release_files = {}
-        rhel_product_certs = {}
-        rhel_signed_packages = {}
-        rhel_enabled_repos = {}
-        partition_result = {
-            "facts": {
-                "rhel_release_files": rhel_release_files,
-                "rhel_product_certs": rhel_product_certs,
-                "rhel_signed_packages": rhel_signed_packages,
-                "rhel_enabled_repos": rhel_enabled_repos,
-            }
+    )
+    rhel_release_files = {}
+    rhel_product_certs = {}
+    rhel_signed_packages = {}
+    rhel_enabled_repos = {}
+    partition_result = {
+        "facts": {
+            "rhel_release_files": rhel_release_files,
+            "rhel_product_certs": rhel_product_certs,
+            "rhel_signed_packages": rhel_signed_packages,
+            "rhel_enabled_repos": rhel_enabled_repos,
         }
-        results["images"][image_id]["drives"][drive][partition] = partition_result
-        try:
-            with mount(partition, INSPECT_PATH):
-                check_release_files(partition, rhel_release_files)
-                check_for_rhel_certs(partition, rhel_product_certs)
-                check_enabled_repos(partition, rhel_enabled_repos)
-                check_for_signed_packages(
-                    partition, rhel_signed_packages, image_id, debug
-                )
+    }
+    image_results["drives"][drive][partition] = partition_result
+    try:
+        with mount(partition, INSPECT_PATH):
+            check_release_files(partition, rhel_release_files)
+            check_for_rhel_certs(partition, rhel_product_certs)
+            check_enabled_repos(partition, rhel_enabled_repos)
+            check_for_signed_packages(partition, rhel_signed_packages, image_id, debug)
 
-                os_version = get_os_version(partition)
-                partition_result["facts"]["os_version"] = os_version
+            os_version = get_os_version(partition)
+            partition_result["facts"]["os_version"] = os_version
 
-                syspurpose = get_syspurpose(partition)
-                partition_result["facts"]["syspurpose_contents"] = syspurpose
+            syspurpose = get_syspurpose(partition)
+            partition_result["facts"]["syspurpose_contents"] = syspurpose
 
-                rhel_found = (
-                    rhel_release_files[RHEL_FOUND]
-                    or rhel_product_certs[RHEL_FOUND]
-                    or rhel_enabled_repos[RHEL_FOUND]
-                    or rhel_signed_packages[RHEL_FOUND]
-                )
-
-                if rhel_found and os_version:
-                    # Note: If multiple partitions, the last one found is set.
-                    results["images"][image_id]["rhel_version"] = os_version
-
-                if rhel_found and syspurpose:
-                    syspurpose_parsed = parse_syspurpose(syspurpose, partition)
-                    if syspurpose_parsed:
-                        # Set the syspurpose only if the content parsed successfully.
-                        # Note: If multiple partitions, the last one found is set.
-                        results["images"][image_id]["syspurpose"] = syspurpose_parsed
-
-                results["images"][image_id][RHEL_FOUND] |= rhel_found
-                results["images"][image_id][
-                    "rhel_signed_packages_found"
-                ] |= rhel_signed_packages[RHEL_FOUND]
-                results["images"][image_id][
-                    "rhel_product_certs_found"
-                ] |= rhel_product_certs[RHEL_FOUND]
-                results["images"][image_id][
-                    "rhel_release_files_found"
-                ] |= rhel_release_files[RHEL_FOUND]
-                results["images"][image_id][
-                    "rhel_enabled_repos_found"
-                ] |= rhel_enabled_repos[RHEL_FOUND]
-
-                if rhel_found:
-                    click.echo(
-                        _(
-                            "RHEL (version {os_version}) found on: {image_id} "
-                            "in {partition}"
-                        ).format(
-                            os_version=os_version,
-                            image_id=image_id,
-                            partition=partition,
-                        )
-                    )
-                else:
-                    click.echo(_("RHEL not found on: {}").format(image_id))
-
-        except subprocess.CalledProcessError as e:
-            message = (
-                _("Mount of {0} on image {1} failed with error: {2}")
-                .format(partition, image_id, e.stderr)
-                .strip()
+            rhel_found = (
+                rhel_release_files[RHEL_FOUND]
+                or rhel_product_certs[RHEL_FOUND]
+                or rhel_enabled_repos[RHEL_FOUND]
+                or rhel_signed_packages[RHEL_FOUND]
             )
 
-            click.echo(message, err=True)
-            results["images"][image_id]["drives"][drive][partition]["error"] = e.stderr
-            results["images"][image_id]["errors"].append(message)
-            results["errors"].append(message)
+            if rhel_found and os_version:
+                # Note: If multiple partitions, the last one found is set.
+                image_results["rhel_version"] = os_version
+
+            if rhel_found and syspurpose:
+                syspurpose_parsed = parse_syspurpose(syspurpose, partition)
+                if syspurpose_parsed:
+                    # Set the syspurpose only if the content parsed successfully.
+                    # Note: If multiple partitions, the last one found is set.
+                    image_results["syspurpose"] = syspurpose_parsed
+
+            image_results[RHEL_FOUND] |= rhel_found
+            image_results["rhel_signed_packages_found"] |= rhel_signed_packages[
+                RHEL_FOUND
+            ]
+            image_results["rhel_product_certs_found"] |= rhel_product_certs[RHEL_FOUND]
+            image_results["rhel_release_files_found"] |= rhel_release_files[RHEL_FOUND]
+            image_results["rhel_enabled_repos_found"] |= rhel_enabled_repos[RHEL_FOUND]
+
+            if rhel_found:
+                click.echo(
+                    _(
+                        "RHEL (version {os_version}) found on: {image_id} "
+                        "in {partition}"
+                    ).format(
+                        os_version=os_version, image_id=image_id, partition=partition,
+                    )
+                )
+            else:
+                click.echo(_("RHEL not found on: {}").format(image_id))
+
+    except subprocess.CalledProcessError as e:
+        message = (
+            _("Mount of {0} on image {1} failed with error: {2}")
+            .format(partition, image_id, e.stderr)
+            .strip()
+        )
+
+        click.echo(message, err=True)
+        image_results["drives"][drive][partition]["error"] = e.stderr
+        image_results["errors"].append(message)
+        results["errors"].append(message)
 
 
 @contextmanager
