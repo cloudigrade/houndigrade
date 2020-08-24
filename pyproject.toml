@@ -11,6 +11,7 @@ click = "*"
 "boto3" = "*"
 jsonpickle = "*"
 raven = "*"
+sh = "^1.13.1"
 
 [tool.poetry.dev-dependencies]
 nose = "*"
