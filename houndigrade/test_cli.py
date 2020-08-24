@@ -4,7 +4,7 @@ from gettext import gettext as _
 from subprocess import CalledProcessError
 from textwrap import dedent
 from unittest import TestCase
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, patch
 
 from botocore.exceptions import ClientError
 from cli import _get_sqs_queue_url, main
@@ -24,12 +24,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
     @patch("cli.subprocess.check_output")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     def test_rhel_found_multiple_ways(
         self,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_subprocess_check_output,
-        mock_subprocess_run,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -83,29 +85,9 @@ class TestCLI(TestCase):
             result = runner.invoke(
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
-        self.assertTrue(mock_subprocess_run.called)
-        self.assertEqual(mock_subprocess_run.call_count, 4)
-
-        mock_subprocess_run.assert_has_calls(
-            [
-                call(
-                    ["mount", "-t", "auto", "./dev/xvdf1", "/mnt/inspect"],
-                    check=True,
-                    stderr=-1,
-                    stdout=-1,
-                    universal_newlines=True,
-                ),
-                call(["umount", "/mnt/inspect"]),
-                call(
-                    ["mount", "-t", "auto", "./dev/xvdf2", "/mnt/inspect"],
-                    check=True,
-                    stderr=-1,
-                    stdout=-1,
-                    universal_newlines=True,
-                ),
-                call(["umount", "/mnt/inspect"]),
-            ]
-        )
+        self.assertTrue(mock_sh_mount.called)
+        self.assertEqual(mock_sh_mount.call_count, 2)
+        self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertEqual(result.exit_code, 0)
         self.assertIn('"cloud": "aws"', result.output)
         self.assertIn('"ami-123456789"', result.output)
@@ -202,12 +184,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
     @patch("cli.subprocess.check_output")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     def test_cli_disappearing_files(
         self,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_subprocess_check_output,
-        mock_subprocess_run,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -254,7 +238,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn("No such file or directory", result.output)
 
@@ -271,12 +256,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
     @patch("cli.subprocess.check_output")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     def test_cli_no_version_files(
         self,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_subprocess_check_output,
-        mock_subprocess_run,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -318,7 +305,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -346,12 +334,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -400,30 +390,11 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual(mock_subprocess_run.call_count, 4)
-
-        mock_subprocess_run.assert_has_calls(
-            [
-                call(
-                    ["mount", "-t", "auto", "./dev/xvdf1", "/mnt/inspect"],
-                    check=True,
-                    stderr=-1,
-                    stdout=-1,
-                    universal_newlines=True,
-                ),
-                call(["umount", "/mnt/inspect"]),
-                call(
-                    ["mount", "-t", "auto", "./dev/xvdf2", "/mnt/inspect"],
-                    check=True,
-                    stderr=-1,
-                    stdout=-1,
-                    universal_newlines=True,
-                ),
-                call(["umount", "/mnt/inspect"]),
-            ]
-        )
+        self.assertEqual(mock_sh_mount.call_count, 2)
+        self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertIn(
             '"status": "{}"'.format(
                 _("No release files found on {}".format("./dev/xvdf1"))
@@ -470,12 +441,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -527,7 +500,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -587,12 +561,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos_specified_dir(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -637,7 +613,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -693,12 +670,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos_no_conf(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -743,7 +722,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -799,12 +779,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found_with_bad_yum_conf(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -849,7 +831,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -884,12 +867,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found_with_unreadable_release_file(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -934,7 +919,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertNotIn(
             '"status": "{}"'.format(
@@ -979,12 +965,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_signed_package(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -1029,7 +1017,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -1079,12 +1068,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_product_cert(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -1133,7 +1124,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -1184,12 +1176,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_product_cert_secondary_location(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -1238,7 +1232,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
@@ -1298,12 +1293,14 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_release_file(
         self,
         mock_subprocess_check_output,
-        mock_subprocess_run,
+        mock_sh_mount,
+        mock_sh_umount,
         mock_glob_glob,
         mock_report_results,
     ):
@@ -1350,7 +1347,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn("RHEL (version 7.4) found on: ami-1234567", result.output)
         self.assertIn("RHEL found via release file on: ./dev/xvdf1", result.output)
@@ -1394,9 +1392,10 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
+    @patch("cli.sh.umount")
+    @patch("cli.sh.mount")
     def test_no_rpm_db_early_return(
-        self, mock_subprocess_run, mock_glob_glob, mock_report_results
+        self, mock_sh_mount, mock_sh_umount, mock_glob_glob, mock_report_results
     ):
         """Test error handling when RPM DB does not exist."""
         cloud = "aws"
@@ -1433,7 +1432,8 @@ class TestCLI(TestCase):
                 main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
             )
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
+        self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
 
         mock_report_results.assert_called_once()
@@ -1462,10 +1462,8 @@ class TestCLI(TestCase):
 
     @patch("cli.report_results")
     @patch("cli.glob.glob")
-    @patch("cli.subprocess.run")
-    def test_failed_mount(
-        self, mock_subprocess_run, mock_glob_glob, mock_report_results
-    ):
+    @patch("cli.sh.mount")
+    def test_failed_mount(self, mock_sh_mount, mock_glob_glob, mock_report_results):
         """Test error handling when mount fails."""
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
@@ -1473,7 +1471,7 @@ class TestCLI(TestCase):
         error_message = "Mount failed."
         e = CalledProcessError(1, "mount", stderr=error_message)
 
-        mock_subprocess_run.side_effect = e
+        mock_sh_mount.side_effect = e
 
         def mock_glob_side_effect(pattern):
             return ["./dev/xvdf1"]
@@ -1488,7 +1486,7 @@ class TestCLI(TestCase):
             )
             result = runner.invoke(main, ["-t", image_id, drive_path])
 
-        self.assertTrue(mock_subprocess_run.called)
+        self.assertTrue(mock_sh_mount.called)
         self.assertEqual(result.exit_code, 0)
 
         mock_report_results.assert_called_once()

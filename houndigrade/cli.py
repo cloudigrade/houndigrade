@@ -4,12 +4,14 @@ import glob
 import json
 import os
 import subprocess
+import sys
 from contextlib import contextmanager
 from gettext import gettext as _
 
 import boto3
 import click
 import jsonpickle
+import sh
 from botocore.exceptions import ClientError
 from raven import Client
 
@@ -74,7 +76,11 @@ def main(cloud, target, debug):
     if debug:
         click.echo(json.dumps(results))
 
+    click.echo(_("Reporting results."))
     report_results(results)
+    click.echo(_("Results reported. Exiting"))
+
+    sys.exit(0)
 
 
 def mount_and_inspect(drive, image_id, results, debug):
@@ -237,15 +243,15 @@ def mount(partition, inspect_path):
         inspect_path (str): The path where the partition should be mounted.
 
     """
-    mount_result = subprocess.run(
-        ["mount", "-t", "auto", "{}".format(partition), "{}".format(inspect_path)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
+    click.echo(_("Mounting {}.").format(partition))
+    mount_result = sh.mount(
+        "mount", "-t", "auto", "{}".format(partition), "{}".format(inspect_path)
     )
+    click.echo(_("Mounting result {}.").format(mount_result.exit_code))
     yield mount_result
-    subprocess.run(["umount", "{}".format(inspect_path)])
+    click.echo(_("UnMounting {}.").format(partition))
+    unmount_result = sh.umount("{}".format(inspect_path))
+    click.echo(_("UnMounting result {}.").format(unmount_result.exit_code))
 
 
 def _get_sqs_queue_url(queue_name):
