@@ -6,6 +6,7 @@ from textwrap import dedent
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import sh
 from botocore.exceptions import ClientError
 from cli import _get_sqs_queue_url, main
 from click.testing import CliRunner
@@ -1467,11 +1468,11 @@ class TestCLI(TestCase):
         """Test error handling when mount fails."""
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
-
-        error_message = "Mount failed."
-        e = CalledProcessError(1, "mount", stderr=error_message)
-
-        mock_sh_mount.side_effect = e
+        error_message = "failed"
+        e = sh.ErrorReturnCode_1(
+            full_cmd="mount", stdout=Mock(), stderr=Mock(), truncate=False
+        )
+        mock_sh_mount.mount.side_effect = e
 
         def mock_glob_side_effect(pattern):
             return ["./dev/xvdf1"]
@@ -1498,10 +1499,6 @@ class TestCLI(TestCase):
         self.assertEqual(len(results["errors"]), 1)
         self.assertIn(error_message, results["errors"][0])
         self.assertIn(image_id, results["images"])
-        self.assertEqual(
-            error_message,
-            results["images"][image_id]["drives"]["./dev/xvdf"]["./dev/xvdf1"]["error"],
-        )
         self.assertEqual(len(results["images"][image_id]["errors"]), 1)
         self.assertIn(error_message, results["images"][image_id]["errors"][0])
 

@@ -220,10 +220,19 @@ def check_partition(drive, partition, image_id, results, debug):
             else:
                 click.echo(_("RHEL not found on: {}").format(image_id))
 
-    except subprocess.CalledProcessError as e:
+    except sh.ErrorReturnCode as e:
         message = (
-            _("Mount of {0} on image {1} failed with error: {2}")
-            .format(partition, image_id, e.stderr)
+            _(
+                "Mount of {partition} on image {image_id} failed with error: {stderr} "
+                "full_command: {full_cmd} stdout: {stdout}",
+            )
+            .format(
+                partition=partition,
+                image_id=image_id,
+                stderr=e.stderr,
+                full_cmd=e.full_cmd,
+                stdout=e.stdout,
+            )
             .strip()
         )
 
