@@ -254,7 +254,7 @@ def mount(partition, inspect_path):
     """
     click.echo(_("Mounting {}.").format(partition))
     mount_result = sh.mount(
-        "mount", "-t", "auto", "{}".format(partition), "{}".format(inspect_path)
+        "-t", "auto", "{}".format(partition), "{}".format(inspect_path)
     )
     click.echo(_("Mounting result {}.").format(mount_result.exit_code))
     yield mount_result
