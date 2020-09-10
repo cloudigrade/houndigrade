@@ -218,7 +218,11 @@ def check_partition(drive, partition, image_id, results, debug):
                     )
                 )
             else:
-                click.echo(_("RHEL not found on: {}").format(image_id))
+                click.echo(
+                    _("RHEL not found on: {image_id} in {partition}").format(
+                        image_id=image_id, partition=partition
+                    )
+                )
 
     except sh.ErrorReturnCode as e:
         message = (
