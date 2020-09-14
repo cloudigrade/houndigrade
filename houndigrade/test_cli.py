@@ -1,10 +1,11 @@
 """Collection of tests for ``cli`` module."""
 import pathlib
 from gettext import gettext as _
+from itertools import chain
 from subprocess import CalledProcessError
 from textwrap import dedent
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import sh
 from botocore.exceptions import ClientError
@@ -24,6 +25,7 @@ class TestCLI(TestCase):
         self.assertIn("Error: Missing option '--target' / '-t'.", result.output)
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.subprocess.check_output")
     @patch("cli.sh.umount")
@@ -34,6 +36,7 @@ class TestCLI(TestCase):
         mock_sh_umount,
         mock_subprocess_check_output,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via multiple ways."""
@@ -119,6 +122,7 @@ class TestCLI(TestCase):
         )
         self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -139,9 +143,10 @@ class TestCLI(TestCase):
         )
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.subprocess.run")
     def test_results_error_when_mount_path_does_not_exist(
-        self, mock_subprocess_run, mock_report_results
+        self, mock_subprocess_run, mock_describe_devices, mock_report_results
     ):
         """Test errors in the results when mount path does not exist."""
         cloud = "aws"
@@ -160,6 +165,7 @@ class TestCLI(TestCase):
         self.assertFalse(mock_subprocess_run.called)
         self.assertEqual(result.exit_code, 0)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -180,6 +186,7 @@ class TestCLI(TestCase):
         self.assertIn(expected_error_message, image_result["errors"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.subprocess.check_output")
     @patch("cli.sh.umount")
@@ -190,6 +197,7 @@ class TestCLI(TestCase):
         mock_sh_umount,
         mock_subprocess_check_output,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test appropriate error handling when expected files are missing."""
@@ -238,6 +246,7 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("No such file or directory", result.output)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -250,6 +259,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.subprocess.check_output")
     @patch("cli.sh.umount")
@@ -260,6 +270,7 @@ class TestCLI(TestCase):
         mock_sh_umount,
         mock_subprocess_check_output,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test appropriate error handling when release files are missing."""
@@ -314,6 +325,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -326,6 +338,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -336,6 +349,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test not finding RHEL via normal inspection."""
@@ -414,6 +428,7 @@ class TestCLI(TestCase):
         )
         self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -431,6 +446,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -441,6 +457,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos."""
@@ -532,6 +549,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -549,6 +567,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -559,6 +578,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos in custom yum repos path."""
@@ -639,6 +659,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -656,6 +677,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -666,6 +688,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos without yum.conf."""
@@ -746,6 +769,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -763,6 +787,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -773,6 +798,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test not finding RHEL with bad yum.conf."""
@@ -832,6 +858,7 @@ class TestCLI(TestCase):
             "RHEL not found via product certificate on: ./dev/xvdf1", result.output
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -849,6 +876,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -859,6 +887,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test not finding RHEL with an unreadable release file."""
@@ -919,6 +948,7 @@ class TestCLI(TestCase):
             "RHEL not found via product certificate on: ./dev/xvdf1", result.output
         )
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -945,6 +975,7 @@ class TestCLI(TestCase):
         )
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -955,6 +986,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via signed package."""
@@ -1029,6 +1061,7 @@ class TestCLI(TestCase):
         self.assertIn("No yum.conf file found on: ./dev/xvdf2", result.output)
         self.assertIn("No .repo files found on: ./dev/xvdf2", result.output)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1046,6 +1079,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -1056,6 +1090,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via product certificate in primary location."""
@@ -1135,6 +1170,7 @@ class TestCLI(TestCase):
         self.assertIn(
             "RHEL found via product certificate on: ./dev/xvdf3", result.output
         )
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1152,6 +1188,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -1162,6 +1199,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via product certificate in secondary location."""
@@ -1250,6 +1288,7 @@ class TestCLI(TestCase):
         self.assertIn(
             "RHEL found via product certificate on: ./dev/xvdf3", result.output
         )
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1267,6 +1306,7 @@ class TestCLI(TestCase):
         self.assertIsNone(results["images"][image_id]["syspurpose"])
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
@@ -1277,6 +1317,7 @@ class TestCLI(TestCase):
         mock_sh_mount,
         mock_sh_umount,
         mock_glob_glob,
+        mock_describe_devices,
         mock_report_results,
     ):
         """Test finding RHEL via etc release file."""
@@ -1344,6 +1385,7 @@ class TestCLI(TestCase):
         self.assertIn("RHEL found via release file on: ./dev/xvdf2", result.output)
         self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1364,11 +1406,17 @@ class TestCLI(TestCase):
         )
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.umount")
     @patch("cli.sh.mount")
     def test_no_rpm_db_early_return(
-        self, mock_sh_mount, mock_sh_umount, mock_glob_glob, mock_report_results
+        self,
+        mock_sh_mount,
+        mock_sh_umount,
+        mock_glob_glob,
+        mock_describe_devices,
+        mock_report_results,
     ):
         """Test error handling when RPM DB does not exist."""
         cloud = "aws"
@@ -1407,6 +1455,7 @@ class TestCLI(TestCase):
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIn("cloud", results)
@@ -1432,9 +1481,12 @@ class TestCLI(TestCase):
         )
 
     @patch("cli.report_results")
+    @patch("cli.describe_devices")
     @patch("cli.glob.glob")
     @patch("cli.sh.mount")
-    def test_failed_mount(self, mock_sh_mount, mock_glob_glob, mock_report_results):
+    def test_failed_mount(
+        self, mock_sh_mount, mock_glob_glob, mock_describe_devices, mock_report_results
+    ):
         """Test error handling when mount fails."""
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
@@ -1460,6 +1512,7 @@ class TestCLI(TestCase):
         self.assertTrue(mock_sh_mount.called)
         self.assertEqual(result.exit_code, 0)
 
+        mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
 
@@ -1816,3 +1869,57 @@ class TestCLI(TestCase):
         self.assertEqual(queue_url, expected_url)
         mock_client.get_queue_url.assert_called_with(QueueName=queue_name)
         mock_client.create_queue.assert_called_with(QueueName=queue_name)
+
+    @patch("cli.get_partitions")
+    @patch("cli.sh")
+    def test_describe_devices(
+        self, mock_sh, mock_get_partitions,
+    ):
+        """Assert various expected sh calls for describe_devices."""
+        from cli import describe_devices
+
+        amis = ("ami-potato", "ami-gems")
+        drives = ("/dev/xvdp", "/dev/xvdg")
+        targets = zip(amis, drives)
+        partitions = (("/dev/xvdp1", "/dev/xvdp2"), ("/dev/xvdg1",))
+
+        mock_get_partitions.side_effect = partitions
+        expected_get_partition_calls = [call(drive) for drive in drives]
+
+        mock_sh.fdisk.return_value = Mock()  # necessary due to how click.echo wraps it
+        expected_fdisk_calls = [call("-l", drive) for drive in drives]
+
+        udevadm_info_path = "/some/other/path"
+        mock_sh.udevadm.return_value = udevadm_info_path
+        expected_udevadm_calls = list(
+            # from_iterable flattens the nested lists to a single list of calls
+            chain.from_iterable(
+                [
+                    [
+                        call("info", "-q", "path", "-n", partition),
+                        call("test", "-a", "-p", udevadm_info_path),
+                        call("info", "--query=all", f"--name={partition}"),
+                    ]
+                    for partition in chain.from_iterable(partitions)
+                ]
+            )
+        )
+
+        mock_sh.lsblk.return_value = Mock()  # necessary due to how click.echo wraps it
+        expected_lsblk_calls = [
+            call(
+                "--all",
+                "--ascii",
+                "--output",
+                "NAME,TYPE,FSTYPE,PARTLABEL,MOUNTPOINT",
+                drive,
+            )
+            for drive in drives
+        ]
+
+        describe_devices(targets)
+        mock_get_partitions.assert_has_calls(expected_get_partition_calls)
+        mock_sh.pvs.assert_called_once()
+        mock_sh.fdisk.assert_has_calls(expected_fdisk_calls)
+        mock_sh.udevadm.assert_has_calls(expected_udevadm_calls)
+        mock_sh.lsblk.assert_has_calls(expected_lsblk_calls)

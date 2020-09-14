@@ -6,7 +6,7 @@ COPY poetry.lock .
 COPY pyproject.toml .
 
 RUN microdnf update \
-    && microdnf install util-linux which python38-pip \
+    && microdnf install util-linux which python38-pip lvm2 udev \
     && if [ ! -e /usr/bin/pip ]; then ln -s /usr/bin/pip3.8 /usr/bin/pip ; fi \
     && if [[ ! -e /usr/bin/python ]]; then ln -sf /usr/bin/python3.8 /usr/bin/python; fi \
     && pip install poetry \

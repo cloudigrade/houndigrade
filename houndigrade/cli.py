@@ -62,9 +62,7 @@ def main(cloud, target):
     """
     click.echo(_("Provided cloud: {}").format(cloud))
     click.echo(_("Provided drive(s) to inspect: {}").format(target))
-
-    all_devices = os.listdir("/dev/")
-    click.echo(_("/dev/ contains: {}").format(all_devices))
+    describe_devices(target)
 
     results = {"cloud": cloud, "images": {}, "errors": []}
 
@@ -80,6 +78,47 @@ def main(cloud, target):
     sys.exit(0)
 
 
+def describe_devices(target):
+    """Describe all devices for diagnosing general issues."""
+    try:
+        all_devices = os.listdir("/dev/")
+        click.echo(_("/dev/ contains: {}").format(all_devices))
+        click.echo(sh.pvs("-a"))
+
+        for image_id, drive in target:
+            click.echo(
+                _("General information about device {drive} for {image_id}:").format(
+                    drive=drive, image_id=image_id
+                )
+            )
+            click.echo(str(sh.fdisk("-l", drive)))
+
+            # Because udev device initialization is weird in Docker, we have to "test"
+            # each partition before we can see useful details about their filesystems.
+            # Because udev data is used under the covers by lsblk, this test also needs
+            # to happen before calling lsblk.
+            partitions = get_partitions(drive)
+            for partition in partitions:
+                # get the "/devices/..." block path
+                device_block_path = sh.udevadm("info", "-q", "path", "-n", partition)
+                # test the device on that path so udev refreshes its knowledge
+                sh.udevadm("test", "-a", "-p", device_block_path.strip())
+                # then we can ask for info and hopefully get a useful response
+                click.echo(sh.udevadm("info", "--query=all", f"--name={partition}"))
+
+            click.echo(
+                sh.lsblk(
+                    "--all",
+                    "--ascii",
+                    "--output",
+                    "NAME,TYPE,FSTYPE,PARTLABEL,MOUNTPOINT",
+                    drive,
+                )
+            )
+    except Exception as e:
+        click.echo(_("Unexpected error in describe_devices: {0}").format(e))
+
+
 def mount_and_inspect(drive, image_id, results):
     """
     Mount provided drive and inspect it.
@@ -92,7 +131,7 @@ def mount_and_inspect(drive, image_id, results):
         results (dict): The results of the inspection.
 
     """
-    click.echo(_("Checking drive {}").format(drive))
+    click.echo(_("Checking drive {0} for {1}").format(drive, image_id))
 
     if image_id not in results["images"]:
         results["images"][image_id] = {
