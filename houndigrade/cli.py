@@ -71,7 +71,7 @@ def main(cloud, target):
     for image_id, drive in target:
         mount_and_inspect(drive, image_id, results)
 
-    click.echo(json.dumps(results))
+    click.echo(jsonpickle.encode(results))
 
     click.echo(_("Reporting results."))
     report_results(results)
