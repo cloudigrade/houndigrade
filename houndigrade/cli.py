@@ -50,8 +50,7 @@ RH_KEY_IDS = [
         " -t ami-12312839312 /dev/sda"
     ),
 )
-@click.option("--debug", is_flag=True, help=_("Print debug output."))
-def main(cloud, target, debug):
+def main(cloud, target):
     """
     Mounts provided volumes and inspects them.
 
@@ -64,17 +63,15 @@ def main(cloud, target, debug):
     click.echo(_("Provided cloud: {}").format(cloud))
     click.echo(_("Provided drive(s) to inspect: {}").format(target))
 
-    if debug:
-        all_devices = os.listdir("/dev/")
-        click.echo(_("/dev/ contains: {}").format(all_devices))
+    all_devices = os.listdir("/dev/")
+    click.echo(_("/dev/ contains: {}").format(all_devices))
 
     results = {"cloud": cloud, "images": {}, "errors": []}
 
     for image_id, drive in target:
-        mount_and_inspect(drive, image_id, results, debug)
+        mount_and_inspect(drive, image_id, results)
 
-    if debug:
-        click.echo(json.dumps(results))
+    click.echo(json.dumps(results))
 
     click.echo(_("Reporting results."))
     report_results(results)
@@ -83,7 +80,7 @@ def main(cloud, target, debug):
     sys.exit(0)
 
 
-def mount_and_inspect(drive, image_id, results, debug):
+def mount_and_inspect(drive, image_id, results):
     """
     Mount provided drive and inspect it.
 
@@ -93,7 +90,6 @@ def mount_and_inspect(drive, image_id, results, debug):
         drive (str): The path to the drive to mount.
         image_id (str): The id of the image we're inspecting.
         results (dict): The results of the inspection.
-        debug (bool): Boolean regarding whether or not we are in debug mode.
 
     """
     click.echo(_("Checking drive {}").format(drive))
@@ -132,10 +128,10 @@ def mount_and_inspect(drive, image_id, results, debug):
         return
 
     for partition in partitions:
-        check_partition(drive, partition, image_id, results, debug)
+        check_partition(drive, partition, image_id, results)
 
 
-def check_partition(drive, partition, image_id, results, debug):
+def check_partition(drive, partition, image_id, results):
     """
     Check the partition.
 
@@ -146,7 +142,6 @@ def check_partition(drive, partition, image_id, results, debug):
         partition (str): The partition mounted from the drive.
         image_id (str): The id of the image we're inspecting.
         results (dict): The results of the inspection.
-        debug (bool): Boolean regarding whether or not we are in debug mode.
 
     """
     image_results = results["images"][image_id]
@@ -174,7 +169,7 @@ def check_partition(drive, partition, image_id, results, debug):
             check_release_files(partition, rhel_release_files)
             check_for_rhel_certs(partition, rhel_product_certs)
             check_enabled_repos(partition, rhel_enabled_repos)
-            check_for_signed_packages(partition, rhel_signed_packages, image_id, debug)
+            check_for_signed_packages(partition, rhel_signed_packages, image_id)
 
             os_version = get_os_version(partition)
             partition_result["facts"]["os_version"] = os_version
@@ -386,7 +381,7 @@ def check_release_files(partition, results):
         results["status"] = "\n".join(exception_messages)
 
 
-def check_for_signed_packages(partition, results, image_id, debug):
+def check_for_signed_packages(partition, results, image_id):
     """
     Check partition for redhat signed packages installed.
 
@@ -395,7 +390,6 @@ def check_for_signed_packages(partition, results, image_id, debug):
         results (dict): Part of the results dict to which we should be
         writing our results.
         image_id (str): The image that we are currently checking.
-        debug (bool): Bool regarding whether or not we are in debug mode.
 
     """
     if not glob.glob("{0}/var/lib/rpm/*".format(INSPECT_PATH)):
@@ -431,13 +425,11 @@ def check_for_signed_packages(partition, results, image_id, debug):
         signed_rpm_count = int(rpm_result.strip())
     except subprocess.CalledProcessError as e:
         results["error"] = e.stderr
-        if debug:
-            click.echo(
-                _(
-                    'The `{0}` command ran on {1} on image "{2}" failed with '
-                    "error: {3}."
-                ).format(rpm_command, partition, image_id, e.stderr)
-            )
+        click.echo(
+            _(
+                'The `{0}` command ran on {1} on image "{2}" failed with ' "error: {3}."
+            ).format(rpm_command, partition, image_id, e.stderr)
+        )
 
     if signed_rpm_count:
         results["rhel_found"] = True

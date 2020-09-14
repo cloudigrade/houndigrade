@@ -83,9 +83,7 @@ class TestCLI(TestCase):
             self.prep_fs(drive_path)
             self.prepare_fs_with_rhel_repos(drive_path)
 
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
         self.assertTrue(mock_sh_mount.called)
         self.assertEqual(mock_sh_mount.call_count, 2)
         self.assertEqual(mock_sh_umount.call_count, 2)
@@ -153,9 +151,7 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         expected_error_message = _("Nothing found at path {} for {}").format(
             drive_path, image_id
@@ -235,9 +231,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -302,9 +296,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -387,9 +379,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_non_enabled_repos(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -497,9 +487,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_rhel_repos(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -610,9 +598,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_reposdir_specified(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -719,9 +705,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_reposdir_specified(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -828,9 +812,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_bad_yum_conf(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -916,9 +898,7 @@ class TestCLI(TestCase):
                 parents=True, exist_ok=True
             )
             self.prepare_fs_with_bad_release_file(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1014,9 +994,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1121,9 +1099,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1229,9 +1205,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1344,9 +1318,7 @@ class TestCLI(TestCase):
 
         with runner.isolated_filesystem():
             self.prep_fs(drive_path)
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1429,9 +1401,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            result = runner.invoke(
-                main, ["-c", cloud, "--debug", "-t", image_id, drive_path]
-            )
+            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
