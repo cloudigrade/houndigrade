@@ -1,16 +1,15 @@
 """Collection of tests for ``cli`` module."""
 import pathlib
 from gettext import gettext as _
-from itertools import chain
 from subprocess import CalledProcessError
-from textwrap import dedent
 from unittest import TestCase
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, patch
 
 import sh
-from botocore.exceptions import ClientError
-from cli import _get_sqs_queue_url, main
 from click.testing import CliRunner
+
+from cli import main
+from tests import helper
 
 
 class TestCLI(TestCase):
@@ -83,8 +82,8 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            self.prep_fs(drive_path)
-            self.prepare_fs_with_rhel_repos(drive_path)
+            helper.prepare_fs(drive_path)
+            helper.prepare_fs_with_rhel_repos(drive_path)
 
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
         self.assertTrue(mock_sh_mount.called)
@@ -392,7 +391,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_non_enabled_repos(drive_path)
+            helper.prepare_fs_with_non_enabled_repos(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -503,7 +502,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_rhel_repos(drive_path)
+            helper.prepare_fs_with_rhel_repos(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -617,7 +616,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_reposdir_specified(drive_path)
+            helper.prepare_fs_with_reposdir_specified(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -727,7 +726,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_reposdir_specified(drive_path)
+            helper.prepare_fs_with_reposdir_specified(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -837,7 +836,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_bad_yum_conf(drive_path)
+            helper.prepare_fs_with_bad_yum_conf(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -926,7 +925,7 @@ class TestCLI(TestCase):
             pathlib.Path("{}/xvdf1".format(drive_path)).mkdir(
                 parents=True, exist_ok=True
             )
-            self.prepare_fs_with_bad_release_file(drive_path)
+            helper.prepare_fs_with_bad_release_file(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -1358,7 +1357,7 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            self.prep_fs(drive_path)
+            helper.prepare_fs(drive_path)
             result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
 
         self.assertTrue(mock_sh_mount.called)
@@ -1524,402 +1523,3 @@ class TestCLI(TestCase):
         self.assertIn(image_id, results["images"])
         self.assertEqual(len(results["images"][image_id]["errors"]), 1)
         self.assertIn(error_message, results["images"][image_id]["errors"][0])
-
-    @staticmethod
-    def prep_fs(drive_path):
-        """Prepare a filesystem directory for testing."""
-        pathlib.Path("{}/xvdf1/etc/rhsm/syspurpose".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf2/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-
-        redhat_release = "Red Hat Enterprise Linux Server release 7.4 (Maipo)\n"
-        centos_release = "CentOS Linux release 7.4.1708 (Core)\n"
-
-        rh_os_release = """\
-            NAME="Red Hat Enterprise Linux Server"
-            VERSION="7.4 (Maipo)"
-            ID="rhel"
-            ID_LIKE="fedora"
-            VARIANT="Server"
-            VARIANT_ID="server"
-            VERSION_ID="7.4"
-            PRETTY_NAME="Red Hat Enterprise Linux Server 7.4 (Maipo)"
-            ANSI_COLOR="0;31"
-            CPE_NAME="cpe:/o:redhat:enterprise_linux:7.4:GA:server"
-            HOME_URL="https://www.redhat.com/"
-            BUG_REPORT_URL="https://bugzilla.redhat.com/"
-
-            REDHAT_BUGZILLA_PRODUCT="Red Hat Enterprise Linux 7"
-            REDHAT_BUGZILLA_PRODUCT_VERSION=7.4
-            REDHAT_SUPPORT_PRODUCT="Red Hat Enterprise Linux"
-            REDHAT_SUPPORT_PRODUCT_VERSION="7.4"
-
-            """
-
-        centos_os_release = """\
-            NAME="CentOS Linux"
-            VERSION="7 (Core)"
-            ID="centos"
-            ID_LIKE="rhel fedora"
-            VERSION_ID="7"
-            PRETTY_NAME="CentOS Linux 7 (Core)"
-            ANSI_COLOR="0;31"
-            CPE_NAME="cpe:/o:centos:centos:7"
-            HOME_URL="https://www.centos.org/"
-            BUG_REPORT_URL="https://bugs.centos.org/"
-
-            CENTOS_MANTISBT_PROJECT="CentOS-7"
-            CENTOS_MANTISBT_PROJECT_VERSION="7"
-            REDHAT_SUPPORT_PRODUCT="centos"
-            REDHAT_SUPPORT_PRODUCT_VERSION="7"
-
-            """
-
-        rh_syspurpose = """\
-            {
-              "role": "Red Hat Enterprise Linux Server",
-              "service_level_agreement": "Premium",
-              "usage": "Development/Test"
-            }
-
-            """
-
-        with open("{}/xvdf1/etc/redhat-release".format(drive_path), "w") as f:
-            f.write(redhat_release)
-        with open("{}/xvdf1/etc/os-release".format(drive_path), "w") as f:
-            f.write(dedent(rh_os_release))
-        with open(
-            "{}/xvdf1/etc/rhsm/syspurpose/syspurpose.json".format(drive_path), "w"
-        ) as f:
-            f.write(dedent(rh_syspurpose))
-
-        with open("{}/xvdf2/etc/centos-release".format(drive_path), "w") as f:
-            f.write(centos_release)
-        with open("{}/xvdf2/etc/os-release".format(drive_path), "w") as f:
-            f.write(dedent(centos_os_release))
-
-    @staticmethod
-    def prepare_fs_with_rhel_repos(drive_path):
-        """Prepare a filesystem directory for testing with enabled yum repos."""
-        pathlib.Path("{}/xvdf1/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf2/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf1/etc/yum.repos.d".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf2/etc/yum.repos.d".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-
-        yum_conf = """\
-            [main]
-            cachedir=/var/cache/yum/$basearch/$releasever
-            keepcache=0
-            debuglevel=2
-            logfile=/var/log/yum.log
-            exactarch=1
-            obsoletes=1
-            gpgcheck=1
-            plugins=1
-            installonly_limit=3
-
-            #  This is the default, if you make this bigger yum won't see if the metadata
-            # is newer on the remote and so you'll "gain" the bandwidth of not having to
-            # download the new metadata and "pay" for it by yum not having correct
-            # information.
-            #  It is esp. important, to have correct metadata, for distributions like
-            # Fedora which don't keep old packages around. If you don't like this checking
-            # interupting your command line usage, it's much better to have something
-            # manually check the metadata once an hour (yum-updatesd will do this).
-            # metadata_expire=90m
-
-            # PUT YOUR REPOS HERE OR IN separate files named file.repo
-            # in /etc/yum.repos.d"""  # noqa: E501
-
-        yum_repo_file = """\
-            [rhel7-cdn-internal]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
-            enabled=1
-            gpgcheck=0
-
-            [rhel7-cdn-internal-extras]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
-            enabled=1
-            gpgcheck=0"""  # noqa: E501
-
-        more_rhel_repos = """\
-            [rhel7-cdn-internal-optional]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/optional/os/
-            enabled=1
-            gpgcheck=0"""  # noqa: E501
-
-        with open("{}/xvdf1/etc/yum.conf".format(drive_path), "w") as f:
-            f.write(yum_conf)
-        with open(
-            "{}/xvdf1/etc/yum.repos.d/rhel7-internal.repo".format(drive_path), "w"
-        ) as f:
-            f.write(yum_repo_file)
-        with open("{}/xvdf1/etc/yum.repos.d/rhel.repo".format(drive_path), "w") as f:
-            f.write(more_rhel_repos)
-        with open("{}/xvdf2/etc/yum.conf".format(drive_path), "w") as f:
-            f.write(yum_conf)
-        with open(
-            "{}/xvdf2/etc/yum.repos.d/rhel7-internal.repo".format(drive_path), "w"
-        ) as f:
-            f.write(yum_repo_file)
-
-    @staticmethod
-    def prepare_fs_with_non_enabled_repos(drive_path):
-        """Prepare a filesystem directory for testing with disabled yum repos."""
-        pathlib.Path("{}/xvdf1/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf2/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf1/etc/yum.repos.d".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf2/etc/yum.repos.d".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-
-        yum_conf = """\
-            [main]
-            cachedir=/var/cache/yum/$basearch/$releasever
-            keepcache=0
-            debuglevel=2
-            logfile=/var/log/yum.log
-            exactarch=1
-            obsoletes=1
-            gpgcheck=1
-            plugins=1
-            installonly_limit=3
-
-            #  This is the default, if you make this bigger yum won't see if the metadata
-            # is newer on the remote and so you'll "gain" the bandwidth of not having to
-            # download the new metadata and "pay" for it by yum not having correct
-            # information.
-            #  It is esp. important, to have correct metadata, for distributions like
-            # Fedora which don't keep old packages around. If you don't like this checking
-            # interupting your command line usage, it's much better to have something
-            # manually check the metadata once an hour (yum-updatesd will do this).
-            # metadata_expire=90m
-
-            # PUT YOUR REPOS HERE OR IN separate files named file.repo
-            # in /etc/yum.repos.d"""  # noqa: E501
-
-        non_enabled_repo_file = """\
-            [rhel7-cdn-internal]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
-            enabled=0
-            gpgcheck=0
-
-            [rhel7-cdn-internal-extras]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
-            enabled=0
-            gpgcheck=0
-            """  # noqa: E501
-
-        non_rhel_repo_file = """\
-            [random-cdn-internal]
-            name=Random repo
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
-            enabled=1
-            gpgcheck=0
-
-            [random-cdn-internal-extras]
-            name=Random repo
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
-            enabled=1
-            gpgcheck=0
-            """  # noqa: E501
-
-        with open("{}/xvdf1/etc/yum.conf".format(drive_path), "w") as f:
-            f.write(yum_conf)
-        with open(
-            "{}/xvdf1/etc/yum.repos.d/rhel7-internal.repo".format(drive_path), "w"
-        ) as f:
-            f.write(non_enabled_repo_file)
-        with open("{}/xvdf2/etc/yum.conf".format(drive_path), "w") as f:
-            f.write(yum_conf)
-        with open("{}/xvdf2/etc/yum.repos.d/random.repo".format(drive_path), "w") as f:
-            f.write(non_rhel_repo_file)
-
-    @staticmethod
-    def prepare_fs_with_reposdir_specified(drive_path):
-        """Prepare a filesystem directory for testing with custom yum repo dir."""
-        pathlib.Path("{}/xvdf1/etc".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        pathlib.Path("{}/xvdf1/etc/new_dir/yum_repos".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-
-        yum_conf = """\
-            [main]
-            cachedir=/var/cache/yum/$basearch/$releasever
-            keepcache=0
-            debuglevel=2
-            logfile=/var/log/yum.log
-            exactarch=1
-            obsoletes=1
-            gpgcheck=1
-            plugins=1
-            installonly_limit=3
-            reposdir=/etc/new_dir/yum_repos
-
-            #  This is the default, if you make this bigger yum won't see if the metadata
-            # is newer on the remote and so you'll "gain" the bandwidth of not having to
-            # download the new metadata and "pay" for it by yum not having correct
-            # information.
-            #  It is esp. important, to have correct metadata, for distributions like
-            # Fedora which don't keep old packages around. If you don't like this checking
-            # interupting your command line usage, it's much better to have something
-            # manually check the metadata once an hour (yum-updatesd will do this).
-            # metadata_expire=90m
-
-            # PUT YOUR REPOS HERE OR IN separate files named file.repo
-            # in /etc/yum.repos.d"""  # noqa: E501
-
-        yum_repo_file = """\
-            [rhel7-cdn-internal]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/os/
-            enabled=1
-            gpgcheck=0
-
-            [rhel7-cdn-internal-extras]
-            name=RHEL 7 - $basearch
-            baseurl=http://pulp.dist.prod.ext.phx2.redhat.com/content/dist/rhel/server/7/$releasever/$basearch/extras/os/
-            enabled=1
-            gpgcheck=0"""  # noqa: E501
-
-        with open("{}/xvdf1/etc/yum.conf".format(drive_path), "w") as f:
-            f.write(yum_conf)
-        with open(
-            "{}/xvdf1/etc/new_dir/yum_repos/rhel7-internal.repo".format(drive_path), "w"
-        ) as f:
-            f.write(yum_repo_file)
-
-    @staticmethod
-    def prepare_fs_with_bad_yum_conf(drive_path):
-        """Prepare a filesystem directory for testing with a bad yum repo conf."""
-        pathlib.Path("{}/xvdf1/etc/".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        with open("{}/xvdf1/etc/yum.conf".format(drive_path), "wb") as f:
-            f.write(b"\xac")  # not a valid utf8 string!
-
-    @staticmethod
-    def prepare_fs_with_bad_release_file(drive_path):
-        """Prepare a filesystem directory for testing with a bad release file."""
-        pathlib.Path("{}/xvdf1/etc/".format(drive_path)).mkdir(
-            parents=True, exist_ok=True
-        )
-        release_file_path = "{}/xvdf1/etc/potato-release".format(drive_path)
-        with open(release_file_path, "wb") as f:
-            f.write(b"\xac")  # not a valid utf8 string!
-
-    @patch("cli.boto3")
-    def test_get_sqs_queue_url_for_existing_queue(self, mock_boto3):
-        """
-        Test getting URL for existing SQS queue.
-
-        Note: This function was copied verbatim from `cloudigrade`.
-
-        FIXME: Move this function to a shared library.
-        """
-        mock_client = mock_boto3.client.return_value
-        queue_name = Mock()
-        expected_url = Mock()
-        mock_client.get_queue_url.return_value = {"QueueUrl": expected_url}
-        queue_url = _get_sqs_queue_url(queue_name)
-        self.assertEqual(queue_url, expected_url)
-        mock_client.get_queue_url.assert_called_with(QueueName=queue_name)
-
-    @patch("cli.boto3")
-    def test_get_sqs_queue_url_creates_new_queue(self, mock_boto3):
-        """
-        Test getting URL for a SQS queue that does not yet exist.
-
-        Note: This function was copied verbatim from `cloudigrade`.
-
-        FIXME: Move this function to a shared library.
-        """
-        mock_client = mock_boto3.client.return_value
-        queue_name = Mock()
-        expected_url = Mock()
-        error_response = {"Error": {"Code": ".NonExistentQueue"}}
-        exception = ClientError(error_response, Mock())
-        mock_client.get_queue_url.side_effect = exception
-        mock_client.create_queue.return_value = {"QueueUrl": expected_url}
-        queue_url = _get_sqs_queue_url(queue_name)
-        self.assertEqual(queue_url, expected_url)
-        mock_client.get_queue_url.assert_called_with(QueueName=queue_name)
-        mock_client.create_queue.assert_called_with(QueueName=queue_name)
-
-    @patch("cli.get_partitions")
-    @patch("cli.sh")
-    def test_describe_devices(
-        self, mock_sh, mock_get_partitions,
-    ):
-        """Assert various expected sh calls for describe_devices."""
-        from cli import describe_devices
-
-        amis = ("ami-potato", "ami-gems")
-        drives = ("/dev/xvdp", "/dev/xvdg")
-        targets = zip(amis, drives)
-        partitions = (("/dev/xvdp1", "/dev/xvdp2"), ("/dev/xvdg1",))
-
-        mock_get_partitions.side_effect = partitions
-        expected_get_partition_calls = [call(drive) for drive in drives]
-
-        mock_sh.fdisk.return_value = Mock()  # necessary due to how click.echo wraps it
-        expected_fdisk_calls = [call("-l", drive) for drive in drives]
-
-        udevadm_info_path = "/some/other/path"
-        mock_sh.udevadm.return_value = udevadm_info_path
-        expected_udevadm_calls = list(
-            # from_iterable flattens the nested lists to a single list of calls
-            chain.from_iterable(
-                [
-                    [
-                        call("info", "-q", "path", "-n", partition),
-                        call("test", "-a", "-p", udevadm_info_path),
-                        call("info", "--query=all", f"--name={partition}"),
-                    ]
-                    for partition in chain.from_iterable(partitions)
-                ]
-            )
-        )
-
-        mock_sh.lsblk.return_value = Mock()  # necessary due to how click.echo wraps it
-        expected_lsblk_calls = [
-            call(
-                "--all",
-                "--ascii",
-                "--output",
-                "NAME,TYPE,FSTYPE,PARTLABEL,MOUNTPOINT",
-                drive,
-            )
-            for drive in drives
-        ]
-
-        describe_devices(targets)
-        mock_get_partitions.assert_has_calls(expected_get_partition_calls)
-        mock_sh.pvs.assert_called_once()
-        mock_sh.fdisk.assert_has_calls(expected_fdisk_calls)
-        mock_sh.udevadm.assert_has_calls(expected_udevadm_calls)
-        mock_sh.lsblk.assert_has_calls(expected_lsblk_calls)
