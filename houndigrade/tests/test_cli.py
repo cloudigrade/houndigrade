@@ -15,6 +15,37 @@ from tests import helper
 class TestCLI(TestCase):
     """Test suite for houndigrade CLI."""
 
+    def assertFoundReleaseFile(self, message, path, expect_found=True):
+        """Assert RHEL is or is not found via release file."""
+        self.assertFoundVia(message, "release file", path, expect_found)
+
+    def assertFoundEnabledRepos(self, message, path, expect_found=True):
+        """Assert RHEL is or is not found via enabled repos."""
+        self.assertFoundVia(message, "enabled repos", path, expect_found)
+
+    def assertFoundProductCertificate(self, message, path, expect_found=True):
+        """Assert RHEL is or is not found via product certificate."""
+        self.assertFoundVia(message, "product certificate", path, expect_found)
+
+    def assertFoundSignedPackages(self, message, path, expect_found=True):
+        """Assert RHEL is or is not found via signed packages."""
+        self.assertFoundVia(message, "signed packages", path, expect_found)
+
+    def assertFoundVia(self, message, what, path, expect_found):
+        """Assert RHEL is or is not found via the given "what" string."""
+        expected = (
+            f"RHEL {'found' if expect_found else 'not found'} via {what} on: {path}"
+        )
+        self.assertIn(expected, message)
+
+    def assertRhelFound(self, message, version, ami):
+        """Assert RHEL is found for the ami in the message."""
+        self.assertIn(f"RHEL (version {version}) found on: {ami}", message)
+
+    def assertRhelNotFound(self, message, ami):
+        """Assert RHEL is not found for the ami in the message."""
+        self.assertIn(f"RHEL not found on: {ami}", message)
+
     def test_cli_no_options(self):
         """Test CLI output when given no options."""
         runner = CliRunner()
@@ -44,6 +75,7 @@ class TestCLI(TestCase):
         drive_path = "./dev/xvdf"
         rhel_packages_result = "448\n"
         no_packages_result = "0\n"
+        rhel_version = "7.4"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -91,22 +123,21 @@ class TestCLI(TestCase):
         self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertEqual(result.exit_code, 0)
         self.assertIn('"cloud": "aws"', result.output)
-        self.assertIn('"ami-123456789"', result.output)
-        self.assertIn("RHEL found via release file on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn("RHEL found via signed packages on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf2", result.output
-        )
-        self.assertIn("RHEL found via release file on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL (version 7.4) found on: ami-1234567", result.output)
+        self.assertIn(f'"{image_id}"', result.output)
+
+        partition_path = "./dev/xvdf1"
+        self.assertFoundReleaseFile(result.output, partition_path)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path)
+        self.assertFoundSignedPackages(result.output, partition_path)
+
+        partition_path = "./dev/xvdf2"
+        self.assertFoundReleaseFile(result.output, partition_path)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        self.assertRhelFound(result.output, rhel_version, image_id)
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -135,7 +166,7 @@ class TestCLI(TestCase):
         self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
         self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
         self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
-        self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
+        self.assertEqual(results["images"][image_id]["rhel_version"], rhel_version)
         self.assertEqual(
             results["images"][image_id]["syspurpose"]["role"],
             "Red Hat Enterprise Linux Server",
@@ -411,21 +442,19 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL not found on: ami-1234567", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
+        self.assertRhelNotFound(result.output, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
 
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
@@ -464,6 +493,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -520,21 +550,20 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -585,6 +614,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -634,21 +664,20 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -695,6 +724,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -744,21 +774,20 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -848,14 +877,14 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL not found on: ami-1234567", result.output)
+        self.assertRhelNotFound(result.output, image_id)
         self.assertIn("Error reading yum repo files on", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        # self.assertFoundEnabledRepos(result.output, partition_path)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
 
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
@@ -938,14 +967,13 @@ class TestCLI(TestCase):
             result.output,
         )
         self.assertIn("Error reading release files on ./dev/xvdf1:", result.output)
-        self.assertIn("RHEL not found on: ami-1234567", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
+        self.assertRhelNotFound(result.output, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
 
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
@@ -994,6 +1022,7 @@ class TestCLI(TestCase):
         drive_path = "./dev/xvdf"
         rhel_packages_result = "1\n"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1042,21 +1071,21 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path)
         self.assertIn("No yum.conf file found on: ./dev/xvdf1", result.output)
         self.assertIn("No .repo files found on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL found via signed packages on: ./dev/xvdf1", result.output)
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
         self.assertIn("No yum.conf file found on: ./dev/xvdf2", result.output)
         self.assertIn("No .repo files found on: ./dev/xvdf2", result.output)
 
@@ -1097,6 +1126,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1150,25 +1180,26 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf3", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf3", result.output
-        )
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, True)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, True)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf3"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, True)
+        # self.assertFoundSignedPackages(result.output, partition_path, False)
+
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -1206,6 +1237,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1265,28 +1297,26 @@ class TestCLI(TestCase):
             ),
             result.output,
         )
-        self.assertIn("RHEL (version None) found on: ami-1234567", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf3", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf3", result.output
-        )
-        self.assertIn(
-            "RHEL found via product certificate on: ./dev/xvdf3", result.output
-        )
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, True)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf3"
+        # self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, True)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -1324,6 +1354,7 @@ class TestCLI(TestCase):
         image_id = "ami-123456789"
         drive_path = "./dev/xvdf"
         no_packages_result = "0\n"
+        rhel_version = "7.4"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1363,25 +1394,33 @@ class TestCLI(TestCase):
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertIn("RHEL (version 7.4) found on: ami-1234567", result.output)
-        self.assertIn("RHEL found via release file on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf1", result.output
-        )
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf1", result.output
-        )
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf1", result.output)
-        self.assertIn("RHEL not found via release file on: ./dev/xvdf2", result.output)
-        self.assertIn("RHEL not found via enabled repos on: ./dev/xvdf2", result.output)
-        self.assertIn(
-            "RHEL not found via signed packages on: ./dev/xvdf2", result.output
-        )
-        self.assertIn(
-            "RHEL not found via product certificate on: ./dev/xvdf2", result.output
-        )
-        self.assertIn("RHEL found via release file on: ./dev/xvdf2", result.output)
+        self.assertRhelFound(result.output, rhel_version, image_id)
+
+        partition_path = "./dev/xvdf1"
+        # These two assertions appear to be in conflict, but unfortunately this is
+        # "correct" due to the how our fake filesystem is "working".
+        # When `find_release_files` runs, its `glob` call actually gets *all* release
+        # files in both of our fake partition folders. This means that when we're
+        # looking at "xvdf1" we also see all the files for "xvdf2" and vice versa.
+        # Yes, this is weird, but unfortunately it looks like this issue has been
+        # hiding in our test code for a long time.
+        # TODO Refactor our fake test filesystem logic to address this issue.
+        self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundReleaseFile(result.output, partition_path, True)
+
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
+        partition_path = "./dev/xvdf2"
+        # These two assertions appear to be in conflict. See earlier comment...
+        self.assertFoundReleaseFile(result.output, partition_path, False)
+        self.assertFoundReleaseFile(result.output, partition_path, True)
+
+        self.assertFoundEnabledRepos(result.output, partition_path, False)
+        self.assertFoundProductCertificate(result.output, partition_path, False)
+        self.assertFoundSignedPackages(result.output, partition_path, False)
+
         self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
         mock_describe_devices.assert_called_once()
