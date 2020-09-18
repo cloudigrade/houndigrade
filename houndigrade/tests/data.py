@@ -168,3 +168,15 @@ YUM_REPO_RANDOM_ENABLED = dedent(
     gpgcheck=0
     """  # noqa: E501
 )
+
+
+PRODUCT_CERTIFICATE = dedent(
+    """\
+    -----BEGIN CERTIFICATE-----
+    aGVsbG8gY2xvdWQgZnJpZW5kcyEgdGhpcyBpcyBub3QgcmVhbGx5IGEgdmFsaWQg
+    cHJvZHVjdCBjZXJ0aWZpY2F0ZSwgaXMgaXQ/IHNvcnJ5IGFib3V0IHRoYXQuIHdl
+    IGp1c3QgbmVlZCBzb21lIGR1bW15IGRhdGEgaGVyZSBmb3IgdGVzdGluZy4gaSBo
+    b3BlIHRoYXQncyBva2F5IHdpdGggeW91LiBjaGVlcnMhCg==
+    -----END CERTIFICATE-----
+    """
+)

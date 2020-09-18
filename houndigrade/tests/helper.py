@@ -1,7 +1,9 @@
 """Helper functions for houndigrade tests."""
 import os
 import pathlib
+import random
 
+import cli
 from tests import data
 
 
@@ -84,6 +86,14 @@ def prepare_fs_with_bad_release_file(root_path):
     """Prepare a filesystem directory for testing with a bad release file."""
     release_file_path = "{}/etc/potato-release".format(root_path)
     write_non_utf8_data(release_file_path)
+
+
+def prepare_fs_with_rhel_product_certificate(root_path):
+    """Prepare a filesystem directory for testing with a RHEL product certificate."""
+    cert_dir = random.choice(cli.CERT_PATHS)
+    cert_name = random.choice(cli.RHEL_PEMS)
+    cert_path = f"{root_path}{cert_dir}{cert_name}"
+    write_data(data.PRODUCT_CERTIFICATE, cert_path)
 
 
 def write_data(contents, file_path, mode="w"):
