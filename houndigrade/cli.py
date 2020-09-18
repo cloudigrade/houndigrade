@@ -499,7 +499,7 @@ def get_partitions(drive):
     Returns (list): List of file system paths that much the pattern.
 
     """
-    return glob.glob("{}*[0-9]".format(drive))
+    return sorted(glob.glob("{}*[0-9]".format(drive)))
 
 
 def check_file(file_path):
