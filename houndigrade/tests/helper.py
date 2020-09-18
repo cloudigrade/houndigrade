@@ -1,10 +1,85 @@
 """Helper functions for houndigrade tests."""
+import contextlib
 import os
 import pathlib
 import random
+import shutil
+import tempfile
 
 import cli
 from tests import data
+
+
+def absolute_resolved_path(some_path):
+    """Get the absolute path with symlinks resolved from some_path."""
+    return os.path.abspath(str(pathlib.Path(some_path).resolve()))
+
+
+def safety_check_path(some_path, expected_common):
+    """
+    Perform checks on some_path to ensure it is safe for use in our tests.
+
+    For our tests, we need to be extra careful that certain paths are both inside the
+    main temp directory and inside the current working directory because we are writing
+    and deleting files, and we don't want to accidentally trash our local filesystem.
+
+    First we ensure that the provided some_path is in the standard temp dir.
+    Then we ensure that some_path is also in the expected_common_path.
+    At each step, we get the absolute path and resolve any potential symlinks.
+
+    If any sanity checks fail, raise ValueError.
+
+    Args:
+        some_path (str): path to check and sanitize
+        expected_common (str): path that should share a common base with some_path
+    """
+    tempdir_path = tempfile.gettempdir()
+    absolute_tempdir_path = absolute_resolved_path(tempdir_path)
+    absolute_some_path = absolute_resolved_path(some_path)
+    common_path = os.path.commonpath([absolute_tempdir_path, absolute_some_path])
+    if not common_path.startswith(absolute_tempdir_path):
+        raise ValueError(
+            f"some_path is not in tempdir. "
+            f"some_path is {some_path} but tempdir is {tempdir_path}"
+        )
+
+    absolute_expected_common = absolute_resolved_path(expected_common)
+    common_path = os.path.commonpath([absolute_expected_common, absolute_some_path])
+    if not common_path.startswith(absolute_expected_common):
+        raise ValueError(
+            f"some_path is not in expected_common. "
+            f"some_path is {some_path} but expected_common is {expected_common}"
+        )
+
+
+def fake_mount(tempdir_path):
+    """Create a context manager that mimics the behavior of `mount`."""
+
+    @contextlib.contextmanager
+    def _fake_mount(device_path, mount_path):
+        """
+        Fake `mount` so device_path's directory contents appear at mount_path.
+
+        This ultimately just copies the directory at device_path to mount_path after
+        performing some sanity checks on their paths.
+
+        Args:
+            device_path: source path
+            mount_path: destination path
+        """
+        cwd = os.getcwd()
+        safety_check_path(cwd, tempdir_path)  # ensure cwd is in tempdir_path
+        safety_check_path(device_path, cwd)  # ensure device_path is in cwd
+        safety_check_path(mount_path, cwd)  # ensure mount_path is in cwd
+
+        shutil.rmtree(mount_path, ignore_errors=True)
+        mount_path_parent = os.path.dirname(absolute_resolved_path(mount_path))
+        pathlib.Path(mount_path_parent).mkdir(parents=True, exist_ok=True)
+        shutil.copytree(device_path, mount_path)
+        yield
+        shutil.rmtree(mount_path)
+
+    return _fake_mount
 
 
 def prepare_fs_empty(root_path):
