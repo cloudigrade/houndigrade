@@ -6,7 +6,7 @@ from tests import data
 
 
 def prepare_fs_empty(root_path):
-    """Prepare an filesystem directory."""
+    """Prepare an empty filesystem directory."""
     pathlib.Path(root_path).mkdir(parents=True, exist_ok=True)
 
 
