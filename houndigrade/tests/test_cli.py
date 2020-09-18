@@ -13,6 +13,10 @@ from click.testing import CliRunner
 from cli import main
 from tests import helper
 
+CLOUD_AWS = "aws"
+RPM_RESULT_FOUND = "448\n"
+RPM_RESULT_NONE = "0\n"
+
 
 class TestCLI(TestCase):
     """Test suite for houndigrade CLI."""
@@ -81,9 +85,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via multiple ways."""
-        cloud = "aws"
-        rhel_packages_result = "448\n"
-        no_packages_result = "0\n"
         rhel_version = "7.4"
 
         def mock_glob_side_effect(pattern):
@@ -116,8 +117,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            rhel_packages_result,
-            no_packages_result,
+            RPM_RESULT_FOUND,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -130,13 +131,13 @@ class TestCLI(TestCase):
             helper.prepare_fs_with_yum(self.partition_2, include_optional=False)
 
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
         self.assertTrue(mock_sh_mount.called)
         self.assertEqual(mock_sh_mount.call_count, 2)
         self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertEqual(result.exit_code, 0)
-        self.assertIn('"cloud": "aws"', result.output)
+        self.assertIn(f'"cloud": "{CLOUD_AWS}"', result.output)
         self.assertIn(f'"{self.aws_image_id}"', result.output)
 
         partition_path = self.partition_1
@@ -203,12 +204,10 @@ class TestCLI(TestCase):
         self, mock_subprocess_run, mock_describe_devices, mock_report_results
     ):
         """Test errors in the results when mount path does not exist."""
-        cloud = "aws"
-
         runner = CliRunner()
         with runner.isolated_filesystem():
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         expected_error_message = _("Nothing found at path {} for {}").format(
@@ -254,8 +253,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test appropriate error handling when expected files are missing."""
-        cloud = "aws"
-        no_packages_result = "0\n"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -280,8 +277,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -289,7 +286,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -325,8 +322,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test appropriate error handling when release files are missing."""
-        cloud = "aws"
-        no_packages_result = "0\n"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -346,8 +341,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -355,7 +350,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -402,8 +397,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test not finding RHEL via normal inspection."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         e = CalledProcessError(1, "mount", stderr="Mount failed.")
 
         def mock_glob_side_effect(pattern):
@@ -431,7 +424,7 @@ class TestCLI(TestCase):
                 return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
-        mock_subprocess_check_output.side_effect = [no_packages_result, e]
+        mock_subprocess_check_output.side_effect = [RPM_RESULT_NONE, e]
 
         runner = CliRunner()
 
@@ -443,7 +436,7 @@ class TestCLI(TestCase):
                 self.partition_2, rhel_enabled=False, include_optional=True
             )
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -518,8 +511,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -549,8 +540,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -559,7 +550,7 @@ class TestCLI(TestCase):
             helper.prepare_fs_with_yum(self.partition_1)
             helper.prepare_fs_with_yum(self.partition_2, include_optional=False)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -645,8 +636,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos in custom yum repos path."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -669,8 +658,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -678,7 +667,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             helper.prepare_fs_with_yum(self.partition_1, default_reposdir=False)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -760,8 +749,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via enabled yum repos without yum.conf."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -784,8 +771,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -798,7 +785,7 @@ class TestCLI(TestCase):
                 self.partition_2, include_yum_conf=False, default_reposdir=False
             )
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -880,8 +867,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test not finding RHEL with bad yum.conf."""
-        cloud = "aws"
-        no_packages_result = "0\n"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -903,8 +888,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -912,7 +897,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             helper.prepare_fs_with_bad_yum_conf(self.partition_1)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -974,8 +959,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test not finding RHEL with an unreadable release file."""
-        cloud = "aws"
-        no_packages_result = "0\n"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -997,8 +980,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -1006,7 +989,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             helper.prepare_fs_with_bad_release_file(self.partition_1)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -1079,9 +1062,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via signed package."""
-        cloud = "aws"
-        rhel_packages_result = "1\n"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -1104,8 +1084,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            rhel_packages_result,
-            no_packages_result,
+            RPM_RESULT_FOUND,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -1113,7 +1093,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -1190,8 +1170,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via product certificate in primary location."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -1218,9 +1196,9 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -1230,7 +1208,7 @@ class TestCLI(TestCase):
             pathlib.Path(self.partition_2).mkdir(parents=True, exist_ok=True)
             pathlib.Path(self.partition_3).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -1309,8 +1287,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via product certificate in secondary location."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
 
         def mock_glob_side_effect(pattern):
@@ -1337,9 +1313,9 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -1349,7 +1325,7 @@ class TestCLI(TestCase):
             pathlib.Path(self.partition_2).mkdir(parents=True, exist_ok=True)
             pathlib.Path(self.partition_3).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -1434,8 +1410,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test finding RHEL via etc release file."""
-        cloud = "aws"
-        no_packages_result = "0\n"
         rhel_version = "7.4"
 
         def mock_glob_side_effect(pattern):
@@ -1463,8 +1437,8 @@ class TestCLI(TestCase):
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
-            no_packages_result,
-            no_packages_result,
+            RPM_RESULT_NONE,
+            RPM_RESULT_NONE,
         ]
 
         runner = CliRunner()
@@ -1474,7 +1448,7 @@ class TestCLI(TestCase):
             helper.prepare_fs_rhel_syspurpose(self.partition_1)
             helper.prepare_fs_centos_release(self.partition_2)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
@@ -1551,7 +1525,6 @@ class TestCLI(TestCase):
         mock_report_results,
     ):
         """Test error handling when RPM DB does not exist."""
-        cloud = "aws"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1578,7 +1551,7 @@ class TestCLI(TestCase):
         with runner.isolated_filesystem():
             pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
             result = runner.invoke(
-                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
 
         self.assertTrue(mock_sh_mount.called)
