@@ -171,6 +171,20 @@ def prepare_fs_with_rhel_product_certificate(root_path):
     write_data(data.PRODUCT_CERTIFICATE, cert_path)
 
 
+def prepare_fs_with_rpm_db(root_path):
+    """
+    Prepare a filesystem directory for testing with an RPM DB directory.
+
+    Note: We do not populate real data here because all of our tests currently just
+    check for the presence of a file. We do not check the content of the file because
+    that would require running the real `rpm` command on the local system, and we
+    cannot assume it is installed and available.
+    """
+    db_file_path = f"{root_path}/var/lib/rpm/taters"
+    db_data = "po-tay-toes"
+    write_data(db_data, db_file_path)
+
+
 def write_data(contents, file_path, mode="w"):
     """Write contents to file_path, also ensuring its parent directory exists."""
     pathlib.Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
