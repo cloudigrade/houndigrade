@@ -1,5 +1,7 @@
 """Collection of tests for ``cli`` module."""
 import pathlib
+import random
+import string
 from gettext import gettext as _
 from subprocess import CalledProcessError
 from unittest import TestCase
@@ -14,6 +16,15 @@ from tests import helper
 
 class TestCLI(TestCase):
     """Test suite for houndigrade CLI."""
+
+    def setUp(self):
+        """Set up random fixture data for each test."""
+        self.aws_image_id = f"ami-{random.randrange(10 ** 11, 10 ** 12 - 1)}"
+        drive_letter = random.choice(string.ascii_lowercase)
+        self.drive_path = f"./dev/xvd{drive_letter}"
+        self.partition_1 = f"{self.drive_path}/xvd{drive_letter}1"
+        self.partition_2 = f"{self.drive_path}/xvd{drive_letter}2"
+        self.partition_3 = f"{self.drive_path}/xvd{drive_letter}3"
 
     def assertFoundReleaseFile(self, message, path, expect_found=True):
         """Assert RHEL is or is not found via release file."""
@@ -71,42 +82,37 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via multiple ways."""
         cloud = "aws"
-        image_id = "ami-123456789"
         rhel_packages_result = "448\n"
         no_packages_result = "0\n"
         rhel_version = "7.4"
 
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
-
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
                 return [
-                    f"{partition_1}/etc/redhat-release",
-                    f"{partition_1}/etc/os-release",
-                    f"{partition_2}/etc/centos-release",
-                    f"{partition_2}/etc/os-release",
+                    f"{self.partition_1}/etc/redhat-release",
+                    f"{self.partition_1}/etc/os-release",
+                    f"{self.partition_2}/etc/centos-release",
+                    f"{self.partition_2}/etc/os-release",
                 ]
             elif "/etc/os-release" in pattern:
-                return [f"{partition_1}/etc/os-release"]
+                return [f"{self.partition_1}/etc/os-release"]
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
-                return [f"{partition_1}/etc/rhsm/syspurpose/syspurpose.json"]
+                return [f"{self.partition_1}/etc/rhsm/syspurpose/syspurpose.json"]
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_1}/etc/pki/product/69.pem"]
+                return [f"{self.partition_1}/etc/pki/product/69.pem"]
             elif "/etc/yum.conf" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.conf",
-                    f"{partition_2}/etc/yum.conf",
+                    f"{self.partition_1}/etc/yum.conf",
+                    f"{self.partition_2}/etc/yum.conf",
                 ]
             elif "/*.repo" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.repos.d/rhel7-internal.repo",
-                    f"{partition_1}/etc/yum.repos.d/rhel.repo",
-                    f"{partition_2}/etc/yum.repos.d/rhel7-internal.repo",
+                    f"{self.partition_1}/etc/yum.repos.d/rhel7-internal.repo",
+                    f"{self.partition_1}/etc/yum.repos.d/rhel.repo",
+                    f"{self.partition_2}/etc/yum.repos.d/rhel7-internal.repo",
                 ]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -117,33 +123,35 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_rhel_release(partition_1)
-            helper.prepare_fs_rhel_syspurpose(partition_1)
-            helper.prepare_fs_centos_release(partition_2)
-            helper.prepare_fs_with_yum(partition_1)
-            helper.prepare_fs_with_yum(partition_2, include_optional=False)
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1)
+            helper.prepare_fs_centos_release(self.partition_2)
+            helper.prepare_fs_with_yum(self.partition_1)
+            helper.prepare_fs_with_yum(self.partition_2, include_optional=False)
 
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
         self.assertTrue(mock_sh_mount.called)
         self.assertEqual(mock_sh_mount.call_count, 2)
         self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertEqual(result.exit_code, 0)
         self.assertIn('"cloud": "aws"', result.output)
-        self.assertIn(f'"{image_id}"', result.output)
+        self.assertIn(f'"{self.aws_image_id}"', result.output)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         self.assertFoundReleaseFile(result.output, partition_path)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path)
         self.assertFoundSignedPackages(result.output, partition_path)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         self.assertFoundReleaseFile(result.output, partition_path)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -165,16 +173,26 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertTrue(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
-        self.assertEqual(results["images"][image_id]["rhel_version"], rhel_version)
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
         self.assertEqual(
-            results["images"][image_id]["syspurpose"]["role"],
+            results["images"][self.aws_image_id]["rhel_version"], rhel_version
+        )
+        self.assertEqual(
+            results["images"][self.aws_image_id]["syspurpose"]["role"],
             "Red Hat Enterprise Linux Server",
         )
 
@@ -186,16 +204,15 @@ class TestCLI(TestCase):
     ):
         """Test errors in the results when mount path does not exist."""
         cloud = "aws"
-        image_id = "ami-123456789"
-        drive_path = "./dev/xvdf"
 
         runner = CliRunner()
-
         with runner.isolated_filesystem():
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         expected_error_message = _("Nothing found at path {} for {}").format(
-            drive_path, image_id
+            self.drive_path, self.aws_image_id
         )
 
         self.assertFalse(mock_subprocess_run.called)
@@ -209,8 +226,8 @@ class TestCLI(TestCase):
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 1)
         self.assertIn(expected_error_message, results["errors"])
-        self.assertIn(image_id, results["images"])
-        image_result = results["images"][image_id]
+        self.assertIn(self.aws_image_id, results["images"])
+        image_result = results["images"][self.aws_image_id]
         self.assertFalse(image_result["rhel_found"])
         self.assertFalse(image_result["rhel_signed_packages_found"])
         self.assertFalse(image_result["rhel_product_certs_found"])
@@ -238,20 +255,15 @@ class TestCLI(TestCase):
     ):
         """Test appropriate error handling when expected files are missing."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
                 return [
-                    f"{partition_1}/etc/redhat-release",
-                    f"{partition_1}/etc/os-release",
-                    f"{partition_2}/etc/centos-release",
-                    f"{partition_2}/etc/os-release",
+                    f"{self.partition_1}/etc/redhat-release",
+                    f"{self.partition_1}/etc/os-release",
+                    f"{self.partition_2}/etc/centos-release",
+                    f"{self.partition_2}/etc/os-release",
                 ]
             elif "/etc/os-release" in pattern:
                 return []
@@ -264,7 +276,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -275,8 +287,10 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -290,10 +304,10 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -312,12 +326,7 @@ class TestCLI(TestCase):
     ):
         """Test appropriate error handling when release files are missing."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -333,7 +342,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -344,21 +353,23 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
@@ -370,10 +381,10 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -392,13 +403,8 @@ class TestCLI(TestCase):
     ):
         """Test not finding RHEL via normal inspection."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         e = CalledProcessError(1, "mount", stderr="Mount failed.")
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -408,21 +414,21 @@ class TestCLI(TestCase):
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.conf",
-                    f"{partition_2}/etc/yum.conf",
+                    f"{self.partition_1}/etc/yum.conf",
+                    f"{self.partition_2}/etc/yum.conf",
                 ]
             elif "/*.repo" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.repos.d/rhel7-internal.repo",
-                    f"{partition_2}/etc/yum.repos.d/random.repo",
+                    f"{self.partition_1}/etc/yum.repos.d/rhel7-internal.repo",
+                    f"{self.partition_2}/etc/yum.repos.d/random.repo",
                 ]
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [no_packages_result, e]
@@ -431,12 +437,14 @@ class TestCLI(TestCase):
 
         with runner.isolated_filesystem():
             helper.prepare_fs_with_yum(
-                partition_1, rhel_enabled=False, include_optional=False
+                self.partition_1, rhel_enabled=False, include_optional=False
             )
             helper.prepare_fs_with_yum(
-                partition_2, rhel_enabled=False, include_optional=True
+                self.partition_2, rhel_enabled=False, include_optional=True
             )
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -445,25 +453,25 @@ class TestCLI(TestCase):
         self.assertEqual(mock_sh_umount.call_count, 2)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelNotFound(result.output, image_id)
+        self.assertRhelNotFound(result.output, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -476,15 +484,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertFalse(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -503,13 +519,8 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via enabled yum repos."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -519,22 +530,22 @@ class TestCLI(TestCase):
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.conf",
-                    f"{partition_2}/etc/yum.conf",
+                    f"{self.partition_1}/etc/yum.conf",
+                    f"{self.partition_2}/etc/yum.conf",
                 ]
             elif "/*.repo" in pattern:
                 return [
-                    f"{partition_1}/etc/yum.repos.d/rhel7-internal.repo",
-                    f"{partition_1}/etc/yum.repos.d/rhel.repo",
-                    f"{partition_2}/etc/yum.repos.d/rhel7-internal.repo",
+                    f"{self.partition_1}/etc/yum.repos.d/rhel7-internal.repo",
+                    f"{self.partition_1}/etc/yum.repos.d/rhel.repo",
+                    f"{self.partition_2}/etc/yum.repos.d/rhel7-internal.repo",
                 ]
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -545,34 +556,36 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_with_yum(partition_1)
-            helper.prepare_fs_with_yum(partition_2, include_optional=False)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            helper.prepare_fs_with_yum(self.partition_1)
+            helper.prepare_fs_with_yum(self.partition_2, include_optional=False)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -598,15 +611,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -625,13 +646,8 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via enabled yum repos in custom yum repos path."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -641,15 +657,15 @@ class TestCLI(TestCase):
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
-                return [f"{partition_1}/etc/yum.conf"]
+                return [f"{self.partition_1}/etc/yum.conf"]
             elif "/*.repo" in pattern:
-                return [f"{partition_1}/etc/new_dir/yum_repos/rhel7-internal.repo"]
+                return [f"{self.partition_1}/etc/new_dir/yum_repos/rhel7-internal.repo"]
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -660,33 +676,35 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_with_yum(partition_1, default_reposdir=False)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            helper.prepare_fs_with_yum(self.partition_1, default_reposdir=False)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -708,15 +726,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -735,13 +761,8 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via enabled yum repos without yum.conf."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -751,15 +772,15 @@ class TestCLI(TestCase):
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
                 return []
             elif "/*.repo" in pattern:
-                return [f"{partition_1}/etc/new_dir/yum_repos/rhel7-internal.repo"]
+                return [f"{self.partition_1}/etc/new_dir/yum_repos/rhel7-internal.repo"]
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -771,37 +792,39 @@ class TestCLI(TestCase):
 
         with runner.isolated_filesystem():
             helper.prepare_fs_with_yum(
-                partition_1, include_yum_conf=False, default_reposdir=False
+                self.partition_1, include_yum_conf=False, default_reposdir=False
             )
             helper.prepare_fs_with_yum(
-                partition_2, include_yum_conf=False, default_reposdir=False
+                self.partition_2, include_yum_conf=False, default_reposdir=False
             )
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -823,15 +846,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertTrue(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -850,11 +881,7 @@ class TestCLI(TestCase):
     ):
         """Test not finding RHEL with bad yum.conf."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -872,7 +899,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1]
+                return [self.partition_1]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -883,22 +910,24 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_with_bad_yum_conf(partition_1)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            helper.prepare_fs_with_bad_yum_conf(self.partition_1)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
-        self.assertRhelNotFound(result.output, image_id)
+        self.assertRhelNotFound(result.output, self.aws_image_id)
         self.assertIn("Error reading yum repo files on", result.output)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         # self.assertFoundEnabledRepos(result.output, partition_path)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -911,15 +940,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertFalse(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -938,15 +975,11 @@ class TestCLI(TestCase):
     ):
         """Test not finding RHEL with an unreadable release file."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
-                return [f"{partition_1}/etc/potato-release"]
+                return [f"{self.partition_1}/etc/potato-release"]
             elif "/etc/os-release" in pattern:
                 return []
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
@@ -960,7 +993,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1]
+                return [self.partition_1]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -971,22 +1004,26 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_with_bad_release_file(partition_1)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            helper.prepare_fs_with_bad_release_file(self.partition_1)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertNotIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
-        self.assertIn(f"Error reading release files on {partition_1}", result.output)
-        self.assertRhelNotFound(result.output, image_id)
+        self.assertIn(
+            f"Error reading release files on {self.partition_1}", result.output
+        )
+        self.assertRhelNotFound(result.output, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, False)
@@ -999,23 +1036,31 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertFalse(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
         self.assertEqual(
             (
-                f"Error reading release files on {partition_1}: "
+                f"Error reading release files on {self.partition_1}: "
                 "'utf-8' codec can't decode byte 0xac in position 0: invalid start byte"
             ),
-            results["images"][image_id]["drives"][drive_path][partition_1]["facts"][
-                "rhel_release_files"
-            ]["status"],
+            results["images"][self.aws_image_id]["drives"][self.drive_path][
+                self.partition_1
+            ]["facts"]["rhel_release_files"]["status"],
         )
 
     @patch("cli.report_results")
@@ -1035,14 +1080,9 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via signed package."""
         cloud = "aws"
-        image_id = "ami-123456789"
         rhel_packages_result = "1\n"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1052,7 +1092,7 @@ class TestCLI(TestCase):
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
                 return []
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
                 return []
             elif "/*.repo" in pattern:
@@ -1060,7 +1100,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -1071,41 +1111,43 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path)
-        self.assertIn(f"No yum.conf file found on: {partition_1}", result.output)
-        self.assertIn(f"No .repo files found on: {partition_1}", result.output)
+        self.assertIn(f"No yum.conf file found on: {partition_path}", result.output)
+        self.assertIn(f"No .repo files found on: {partition_path}", result.output)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
-        self.assertIn(f"No yum.conf file found on: {partition_2}", result.output)
-        self.assertIn(f"No .repo files found on: {partition_2}", result.output)
+        self.assertIn(f"No yum.conf file found on: {partition_path}", result.output)
+        self.assertIn(f"No .repo files found on: {partition_path}", result.output)
 
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
@@ -1114,15 +1156,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertTrue(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -1141,14 +1191,8 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via product certificate in primary location."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
-        partition_3 = f"{drive_path}/xvdf3"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1159,9 +1203,9 @@ class TestCLI(TestCase):
                 return []
             elif "/etc/pki/product/*" in pattern:
                 return [
-                    f"{partition_1}/etc/pki/product/69.pem",
-                    f"{partition_2}/etc/pki/product/185.pem",
-                    f"{partition_3}/etc/pki/product/479.pem",
+                    f"{self.partition_1}/etc/pki/product/69.pem",
+                    f"{self.partition_2}/etc/pki/product/185.pem",
+                    f"{self.partition_3}/etc/pki/product/479.pem",
                 ]
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -1170,7 +1214,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2, partition_3]
+                return [self.partition_1, self.partition_2, self.partition_3]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -1182,41 +1226,43 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            pathlib.Path(partition_2).mkdir(parents=True, exist_ok=True)
-            pathlib.Path(partition_3).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(self.partition_2).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(self.partition_3).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, True)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, True)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_3
+        partition_path = self.partition_3
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, True)
@@ -1229,15 +1275,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -1256,14 +1310,8 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via product certificate in secondary location."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = None  # TODO Is this correct?
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
-        partition_3 = f"{drive_path}/xvdf3"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1274,9 +1322,9 @@ class TestCLI(TestCase):
                 return []
             elif "/etc/pki/product-default/*" in pattern:
                 return [
-                    f"{partition_1}/etc/pki/product-default/69.pem",
-                    f"{partition_2}/etc/pki/product-default/185.pem",
-                    f"{partition_3}/etc/pki/product-default/479.pem",
+                    f"{self.partition_1}/etc/pki/product-default/69.pem",
+                    f"{self.partition_2}/etc/pki/product-default/185.pem",
+                    f"{self.partition_3}/etc/pki/product-default/479.pem",
                 ]
             elif "/etc/yum.conf" in pattern:
                 return []
@@ -1285,7 +1333,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2, partition_3]
+                return [self.partition_1, self.partition_2, self.partition_3]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -1297,47 +1345,49 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            pathlib.Path(partition_2).mkdir(parents=True, exist_ok=True)
-            pathlib.Path(partition_3).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(self.partition_2).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(self.partition_3).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_1))
+                _("No release files found on {}".format(self.partition_1))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_2))
+                _("No release files found on {}".format(self.partition_2))
             ),
             result.output,
         )
         self.assertIn(
             '"status": "{}"'.format(
-                _("No release files found on {}".format(partition_3))
+                _("No release files found on {}".format(self.partition_3))
             ),
             result.output,
         )
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, True)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_3
+        partition_path = self.partition_3
         # self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundEnabledRepos(result.output, partition_path, False)
         self.assertFoundProductCertificate(result.output, partition_path, True)
@@ -1350,15 +1400,23 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertTrue(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -1377,28 +1435,23 @@ class TestCLI(TestCase):
     ):
         """Test finding RHEL via etc release file."""
         cloud = "aws"
-        image_id = "ami-123456789"
         no_packages_result = "0\n"
         rhel_version = "7.4"
-
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
-        partition_2 = f"{drive_path}/xvdf2"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
                 return [
-                    f"{partition_1}/etc/redhat-release",
-                    f"{partition_1}/etc/os-release",
-                    f"{partition_2}/etc/centos-release",
-                    f"{partition_2}/etc/os-release",
+                    f"{self.partition_1}/etc/redhat-release",
+                    f"{self.partition_1}/etc/os-release",
+                    f"{self.partition_2}/etc/centos-release",
+                    f"{self.partition_2}/etc/os-release",
                 ]
             elif "/etc/os-release" in pattern:
-                return [f"{partition_1}/etc/os-release"]
+                return [f"{self.partition_1}/etc/os-release"]
             elif "/etc/rhsm/syspurpose/syspurpose.json" in pattern:
-                return [f"{partition_1}/etc/rhsm/syspurpose/syspurpose.json"]
+                return [f"{self.partition_1}/etc/rhsm/syspurpose/syspurpose.json"]
             elif "/etc/pki/product/*" in pattern:
-                return [f"{partition_2}/etc/pki/product/185.pem"]
+                return [f"{self.partition_2}/etc/pki/product/185.pem"]
             elif "/etc/yum.conf" in pattern:
                 return []
             elif "/*.repo" in pattern:
@@ -1406,7 +1459,7 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return ["__db.001"]
             else:
-                return [partition_1, partition_2]
+                return [self.partition_1, self.partition_2]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
         mock_subprocess_check_output.side_effect = [
@@ -1417,17 +1470,19 @@ class TestCLI(TestCase):
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            helper.prepare_fs_rhel_release(partition_1)
-            helper.prepare_fs_rhel_syspurpose(partition_1)
-            helper.prepare_fs_centos_release(partition_2)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1)
+            helper.prepare_fs_centos_release(self.partition_2)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
         self.assertEqual(result.exit_code, 0)
-        self.assertRhelFound(result.output, rhel_version, image_id)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
 
-        partition_path = partition_1
+        partition_path = self.partition_1
         # These two assertions appear to be in conflict, but unfortunately this is
         # "correct" due to the how our fake filesystem is "working".
         # When `find_release_files` runs, its `glob` call actually gets *all* release
@@ -1443,7 +1498,7 @@ class TestCLI(TestCase):
         self.assertFoundProductCertificate(result.output, partition_path, False)
         self.assertFoundSignedPackages(result.output, partition_path, False)
 
-        partition_path = partition_2
+        partition_path = self.partition_2
         # These two assertions appear to be in conflict. See earlier comment...
         self.assertFoundReleaseFile(result.output, partition_path, False)
         self.assertFoundReleaseFile(result.output, partition_path, True)
@@ -1461,16 +1516,24 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertTrue(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertTrue(results["images"][image_id]["rhel_release_files_found"])
-        self.assertEqual(results["images"][image_id]["rhel_version"], "7.4")
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertTrue(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertEqual(results["images"][self.aws_image_id]["rhel_version"], "7.4")
         self.assertEqual(
-            results["images"][image_id]["syspurpose"]["role"],
+            results["images"][self.aws_image_id]["syspurpose"]["role"],
             "Red Hat Enterprise Linux Server",
         )
 
@@ -1489,9 +1552,6 @@ class TestCLI(TestCase):
     ):
         """Test error handling when RPM DB does not exist."""
         cloud = "aws"
-        image_id = "ami-123456789"
-        drive_path = "./dev/xvdf"
-        partition_1 = f"{drive_path}/xvdf1"
 
         def mock_glob_side_effect(pattern):
             if "etc/*-release" in pattern:
@@ -1509,15 +1569,17 @@ class TestCLI(TestCase):
             elif "/var/lib/rpm/*" in pattern:
                 return []
             else:
-                return [partition_1]
+                return [self.partition_1]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
 
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-c", cloud, "-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(
+                main, ["-c", cloud, "-t", self.aws_image_id, self.drive_path]
+            )
 
         self.assertTrue(mock_sh_mount.called)
         self.assertTrue(mock_sh_umount.called)
@@ -1530,22 +1592,30 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 0)
-        self.assertFalse(results["images"][image_id]["rhel_found"])
-        self.assertFalse(results["images"][image_id]["rhel_signed_packages_found"])
-        self.assertFalse(results["images"][image_id]["rhel_enabled_repos_found"])
-        self.assertFalse(results["images"][image_id]["rhel_product_certs_found"])
-        self.assertFalse(results["images"][image_id]["rhel_release_files_found"])
-        self.assertIsNone(results["images"][image_id]["rhel_version"])
-        self.assertIsNone(results["images"][image_id]["syspurpose"])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
+        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_product_certs_found"]
+        )
+        self.assertFalse(
+            results["images"][self.aws_image_id]["rhel_release_files_found"]
+        )
+        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
         self.assertEqual(
             _("RPM DB directory on {0} has no data for {1}").format(
-                partition_1, image_id
+                self.partition_1, self.aws_image_id
             ),
-            results["images"][image_id]["drives"][drive_path][partition_1]["facts"][
-                "rhel_signed_packages"
-            ]["status"],
+            results["images"][self.aws_image_id]["drives"][self.drive_path][
+                self.partition_1
+            ]["facts"]["rhel_signed_packages"]["status"],
         )
 
     @patch("cli.report_results")
@@ -1556,9 +1626,6 @@ class TestCLI(TestCase):
         self, mock_sh_mount, mock_glob_glob, mock_describe_devices, mock_report_results
     ):
         """Test error handling when mount fails."""
-        image_id = "ami-123456789"
-        drive_path = "./dev/xvdf"
-        partition_1 = "./dev/xvdf/xvdf1"
         error_message = "failed"
         e = sh.ErrorReturnCode_1(
             full_cmd="mount", stdout=Mock(), stderr=Mock(), truncate=False
@@ -1566,15 +1633,15 @@ class TestCLI(TestCase):
         mock_sh_mount.mount.side_effect = e
 
         def mock_glob_side_effect(pattern):
-            return [partition_1]
+            return [self.partition_1]
 
         mock_glob_glob.side_effect = mock_glob_side_effect
 
         runner = CliRunner()
 
         with runner.isolated_filesystem():
-            pathlib.Path(partition_1).mkdir(parents=True, exist_ok=True)
-            result = runner.invoke(main, ["-t", image_id, drive_path])
+            pathlib.Path(self.partition_1).mkdir(parents=True, exist_ok=True)
+            result = runner.invoke(main, ["-t", self.aws_image_id, self.drive_path])
 
         self.assertTrue(mock_sh_mount.called)
         self.assertEqual(result.exit_code, 0)
@@ -1588,6 +1655,6 @@ class TestCLI(TestCase):
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 1)
         self.assertIn(error_message, results["errors"][0])
-        self.assertIn(image_id, results["images"])
-        self.assertEqual(len(results["images"][image_id]["errors"]), 1)
-        self.assertIn(error_message, results["images"][image_id]["errors"][0])
+        self.assertIn(self.aws_image_id, results["images"])
+        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 1)
+        self.assertIn(error_message, results["images"][self.aws_image_id]["errors"][0])
