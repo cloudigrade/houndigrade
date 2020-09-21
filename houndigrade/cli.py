@@ -223,7 +223,11 @@ def check_partition(drive, partition, image_id, results):
                 or rhel_signed_packages[RHEL_FOUND]
             )
 
-            if rhel_found and os_version:
+            if rhel_release_files[RHEL_FOUND] and os_version:
+                # Only set the os_version if RHEL is found in the release files because
+                # we also get os_version from the release files. We don't want to use
+                # the version from some other operating system which could be present
+                # if release files exist but are not for RHEL.
                 # Note: If multiple partitions, the last one found is set.
                 image_results["rhel_version"] = os_version
 

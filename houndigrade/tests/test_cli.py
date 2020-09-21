@@ -177,11 +177,7 @@ class TestCLI(TestCase):
         * RHEL in at least one partition's installed product certificate(s)
         * RHEL in at least one partition's RPM database
         """
-        # rhel_version = "7.4"  # This is correct RHEL version
-        centos_version = "7"  # This is the CentOS version on partition_2.
-        # TODO FIXME Report the version *only* from a RHEL-positive partition!
-        # This pre-existing bug is an unfortunate side-effect of the code near:
-        # "# Note: If multiple partitions, the last one found is set."
+        rhel_version = "7.4"
 
         mock_subprocess_check_output.side_effect = [
             RPM_RESULT_FOUND,  # result for `rpm` call in partition_1
@@ -222,7 +218,7 @@ class TestCLI(TestCase):
         self.assertFoundProductCertificate(result.output, self.partition_2, False)
         self.assertFoundSignedPackages(result.output, self.partition_2, False)
 
-        self.assertRhelFound(result.output, centos_version, self.aws_image_id)  # FIXME
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
             result.output,
@@ -250,7 +246,7 @@ class TestCLI(TestCase):
             rhel_enabled_repos_found=True,
             rhel_product_certs_found=True,
             rhel_release_files_found=True,
-            rhel_version=centos_version,  # FIXME
+            rhel_version=rhel_version,
             syspurpose_role="Red Hat Enterprise Linux Server",
         )
 
