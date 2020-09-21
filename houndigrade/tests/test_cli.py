@@ -4,7 +4,7 @@ import string
 from gettext import gettext as _
 from subprocess import CalledProcessError
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import sh
 from click.testing import CliRunner
@@ -29,6 +29,93 @@ class TestCLI(TestCase):
         self.partition_2 = f"{self.drive_path}2"
         self.partition_3 = f"{self.drive_path}3"
         self.inspect_path = f"./inspect_{random.randrange(10 ** 4, 10 ** 5 - 1)}"
+
+    def assertReportResultsStructure(
+        self, results, image_ids=None, error_messages=None
+    ):
+        """Assert the high-level structures of the report results are correct."""
+        self.assertIn("cloud", results)
+        self.assertIn("images", results)
+        self.assertIn("errors", results)
+
+        actual_errors_count = len(results["errors"])
+        expected_errors_count = len(error_messages) if error_messages else 0
+        self.assertEqual(
+            actual_errors_count,
+            expected_errors_count,
+            f"Expected {expected_errors_count} errors but found {actual_errors_count}",
+        )
+        if error_messages:
+            self.assertListEqual(sorted(results["errors"]), sorted(error_messages))
+
+        actual_images_count = len(results["images"])
+        expected_images_count = len(list(results["images"].keys())) if image_ids else 0
+        self.assertEqual(
+            actual_images_count,
+            expected_images_count,
+            f"Expected {expected_images_count} images but found {actual_images_count}",
+        )
+        if image_ids:
+            self.assertListEqual(sorted(results["images"]), sorted(image_ids))
+
+    def assertReportResultsImageDetails(
+        self,
+        results,
+        image_id,
+        rhel_found=True,
+        rhel_signed_packages_found=True,
+        rhel_enabled_repos_found=True,
+        rhel_product_certs_found=True,
+        rhel_release_files_found=True,
+        rhel_version=None,
+        error_messages=None,
+        syspurpose_role=None,
+    ):
+        """Assert the report results for the given image are correct."""
+        details = results["images"][image_id]
+
+        if rhel_found:
+            self.assertTrue(details["rhel_found"])
+        else:
+            self.assertFalse(details["rhel_found"])
+
+        if rhel_signed_packages_found:
+            self.assertTrue(details["rhel_signed_packages_found"])
+        else:
+            self.assertFalse(details["rhel_signed_packages_found"])
+
+        if rhel_enabled_repos_found:
+            self.assertTrue(details["rhel_enabled_repos_found"])
+        else:
+            self.assertFalse(details["rhel_enabled_repos_found"])
+
+        if rhel_product_certs_found:
+            self.assertTrue(details["rhel_product_certs_found"])
+        else:
+            self.assertFalse(details["rhel_product_certs_found"])
+
+        if rhel_release_files_found:
+            self.assertTrue(details["rhel_release_files_found"])
+        else:
+            self.assertFalse(details["rhel_release_files_found"])
+
+        if rhel_version:
+            self.assertEqual(details["rhel_version"], rhel_version)
+        else:
+            self.assertIsNone(details["rhel_version"])
+
+        actual_errors_count = len(details["errors"])
+        expected_errors_count = len(error_messages) if error_messages else 0
+        self.assertEqual(
+            actual_errors_count,
+            expected_errors_count,
+            f"Expected {expected_errors_count} errors but found {actual_errors_count}",
+        )
+        if error_messages:
+            self.assertListEqual(sorted(details["errors"]), sorted(error_messages))
+
+        if syspurpose_role:
+            self.assertEqual(details["syspurpose"]["role"], syspurpose_role)
 
     def assertNoReleaseFiles(self, message, path):
         """Assert no release files found."""
@@ -153,31 +240,18 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
-        )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertEqual(
-            results["images"][self.aws_image_id]["rhel_version"], centos_version
-        )  # FIXME
-        self.assertEqual(
-            results["images"][self.aws_image_id]["syspurpose"]["role"],
-            "Red Hat Enterprise Linux Server",
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=True,
+            rhel_enabled_repos_found=True,
+            rhel_product_certs_found=True,
+            rhel_release_files_found=True,
+            rhel_version=centos_version,  # FIXME
+            syspurpose_role="Red Hat Enterprise Linux Server",
         )
 
     @patch("cli.report_results")
@@ -203,22 +277,22 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 1)
-        self.assertIn(expected_error_message, results["errors"])
-        self.assertIn(self.aws_image_id, results["images"])
-        image_result = results["images"][self.aws_image_id]
-        self.assertFalse(image_result["rhel_found"])
-        self.assertFalse(image_result["rhel_signed_packages_found"])
-        self.assertFalse(image_result["rhel_product_certs_found"])
-        self.assertFalse(image_result["rhel_release_files_found"])
-        self.assertFalse(image_result["rhel_enabled_repos_found"])
-        self.assertIsNone(image_result["rhel_version"])
-        self.assertIsNone(image_result["syspurpose"])
-        self.assertEqual(len(image_result["errors"]), 1)
-        self.assertIn(expected_error_message, image_result["errors"])
+
+        self.assertReportResultsStructure(
+            results,
+            image_ids=[self.aws_image_id],
+            error_messages=[expected_error_message],
+        )
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            error_messages=[expected_error_message],
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
+        )
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -248,14 +322,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
+        )
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -317,27 +394,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -381,27 +448,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=True,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -439,27 +496,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=True,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -499,27 +546,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=True,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -548,27 +585,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -577,8 +604,6 @@ class TestCLI(TestCase):
         self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
     ):
         """Test not finding RHEL with an unreadable release file."""
-        mock_subprocess_check_output.return_value = RPM_RESULT_NONE
-
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
             "cli.mount", helper.fake_mount(tempdir_path)
@@ -598,32 +623,24 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
+
+        release_files_status = (
+            f"Error reading release files on {self.partition_1}: "
+            "'utf-8' codec can't decode byte 0xac in position 0: invalid start byte"
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
         self.assertEqual(
-            (
-                f"Error reading release files on {self.partition_1}: "
-                "'utf-8' codec can't decode byte 0xac in position 0: invalid start byte"
-            ),
+            release_files_status,
             results["images"][self.aws_image_id]["drives"][self.drive_path][
                 self.partition_1
             ]["facts"]["rhel_release_files"]["status"],
@@ -661,27 +678,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=True,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -713,27 +720,17 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=True,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -765,26 +762,18 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertTrue(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=True,
+            rhel_version=rhel_version,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertTrue(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertEqual(results["images"][self.aws_image_id]["rhel_version"], "7.4")
 
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -805,31 +794,23 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 0)
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 0)
-        self.assertFalse(results["images"][self.aws_image_id]["rhel_found"])
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_signed_packages_found"]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
         )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_enabled_repos_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_product_certs_found"]
-        )
-        self.assertFalse(
-            results["images"][self.aws_image_id]["rhel_release_files_found"]
-        )
-        self.assertIsNone(results["images"][self.aws_image_id]["rhel_version"])
-        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
+
+        signed_packages_status = _(
+            "RPM DB directory on {0} has no data for {1}"
+        ).format(self.partition_1, self.aws_image_id)
         self.assertEqual(
-            _("RPM DB directory on {0} has no data for {1}").format(
-                self.partition_1, self.aws_image_id
-            ),
+            signed_packages_status,
             results["images"][self.aws_image_id]["drives"][self.drive_path][
                 self.partition_1
             ]["facts"]["rhel_signed_packages"]["status"],
@@ -838,9 +819,15 @@ class TestCLI(TestCase):
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.glob.glob")
+    @patch("cli.sh.umount")
     @patch("cli.sh.mount")
     def test_failed_mount(
-        self, mock_sh_mount, mock_glob_glob, mock_describe_devices, mock_report_results
+        self,
+        mock_sh_mount,
+        mock_sh_umount,
+        mock_glob_glob,
+        mock_describe_devices,
+        mock_report_results,
     ):
         """Test error handling when mount fails."""
         full_cmd = "mount command"
@@ -871,20 +858,26 @@ class TestCLI(TestCase):
             helper.prepare_fs_empty(self.partition_1)
             result = runner.invoke(main, ["-t", self.aws_image_id, self.drive_path])
 
-        self.assertTrue(mock_sh_mount.called)
+        mock_sh_mount.assert_called
+        mock_sh_umount.assert_not_called
         self.assertEqual(result.exit_code, 0)
 
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
 
-        self.assertIn("cloud", results)
-        self.assertIn("images", results)
-        self.assertIn("errors", results)
-        self.assertEqual(len(results["errors"]), 1)
-        self.assertIn(expected_error_message, results["errors"][0])
-        self.assertIn(self.aws_image_id, results["images"])
-        self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 1)
-        self.assertIn(
-            expected_error_message, results["images"][self.aws_image_id]["errors"][0]
+        self.assertReportResultsStructure(
+            results,
+            image_ids=[self.aws_image_id],
+            error_messages=[expected_error_message],
+        )
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=False,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=False,
+            error_messages=[expected_error_message],
         )
