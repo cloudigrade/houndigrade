@@ -94,10 +94,12 @@ def prepare_fs_rhel_release(root_path):
     write_data(data.REDHAT_RELEASE, f"{etc_path}/redhat-release")
 
 
-def prepare_fs_rhel_syspurpose(root_path):
+def prepare_fs_rhel_syspurpose(root_path, content=None):
     """Prepare a filesystem directory with a RHEL syspurpose file."""
     etc_path = f"{root_path}/etc"
-    write_data(data.SYSPURPOSE_JSON_RHEL, f"{etc_path}/rhsm/syspurpose/syspurpose.json")
+    if content is None:
+        content = data.SYSPURPOSE_JSON_RHEL
+    write_data(content, f"{etc_path}/rhsm/syspurpose/syspurpose.json")
 
 
 def prepare_fs_centos_release(root_path):

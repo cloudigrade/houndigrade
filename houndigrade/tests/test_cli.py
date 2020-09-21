@@ -881,3 +881,86 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
             error_messages=[expected_error_message],
         )
+
+    @patch("cli.report_results")
+    @patch("cli.describe_devices")
+    def test_syspurpose_empty(self, mock_describe_devices, mock_report_results):
+        """
+        Test error handling when syspurpose.json exists but is empty.
+
+        Note: We have to detect RHEL before we parse the syspurpose.json file.
+        """
+        rhel_version = "7.4"
+        runner = CliRunner()
+        with runner.isolated_filesystem() as tempdir_path, patch(
+            "cli.mount", helper.fake_mount(tempdir_path)
+        ), patch("cli.INSPECT_PATH", self.inspect_path):
+            helper.prepare_fs_empty(self.drive_path)
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1, content="")
+
+            result = runner.invoke(
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_describe_devices.assert_called_once()
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+        self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
+
+    @patch("cli.report_results")
+    @patch("cli.describe_devices")
+    def test_syspurpose_whitespace(self, mock_describe_devices, mock_report_results):
+        """
+        Test error handling when syspurpose.json exists but only has whitespace.
+
+        Note: We have to detect RHEL before we parse the syspurpose.json file.
+        """
+        rhel_version = "7.4"
+        runner = CliRunner()
+        with runner.isolated_filesystem() as tempdir_path, patch(
+            "cli.mount", helper.fake_mount(tempdir_path)
+        ), patch("cli.INSPECT_PATH", self.inspect_path):
+            helper.prepare_fs_empty(self.drive_path)
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1, content="  ")
+
+            result = runner.invoke(
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
+            )
+        self.assertEqual(result.exit_code, 0)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_describe_devices.assert_called_once()
+        mock_report_results.assert_called_once()
+        self.assertIn(f"System purpose is empty on: {self.partition_1}", result.output)
+
+    @patch("cli.report_results")
+    @patch("cli.describe_devices")
+    def test_syspurpose_malformed(self, mock_describe_devices, mock_report_results):
+        """
+        Test error handling when syspurpose.json exists but has non-JSON content.
+
+        Note: We have to detect RHEL before we parse the syspurpose.json file.
+        """
+        rhel_version = "7.4"
+        runner = CliRunner()
+        with runner.isolated_filesystem() as tempdir_path, patch(
+            "cli.mount", helper.fake_mount(tempdir_path)
+        ), patch("cli.INSPECT_PATH", self.inspect_path):
+            helper.prepare_fs_empty(self.drive_path)
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1, content="lol nope!")
+
+            result = runner.invoke(
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
+            )
+        self.assertEqual(result.exit_code, 0)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_describe_devices.assert_called_once()
+        mock_report_results.assert_called_once()
+        self.assertIn(
+            f"Parsing system purpose on {self.partition_1} failed because",
+            result.output,
+        )
