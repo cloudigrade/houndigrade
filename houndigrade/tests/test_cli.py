@@ -843,11 +843,22 @@ class TestCLI(TestCase):
         self, mock_sh_mount, mock_glob_glob, mock_describe_devices, mock_report_results
     ):
         """Test error handling when mount fails."""
-        error_message = "failed"
-        e = sh.ErrorReturnCode_1(
-            full_cmd="mount", stdout=Mock(), stderr=Mock(), truncate=False
+        full_cmd = "mount command"
+        stdout_content = b"this is stdout"
+        stderr_content = b"and this is stderr"
+        e = sh.ErrorReturnCode(
+            full_cmd=full_cmd,
+            stdout=stdout_content,
+            stderr=stderr_content,
+            truncate=False,
         )
-        mock_sh_mount.mount.side_effect = e
+        mock_sh_mount.side_effect = e
+        expected_error_message = (
+            f"Mount of {self.partition_1} on image {self.aws_image_id} "
+            f"failed with error: {stderr_content} "
+            f"full_command: {full_cmd} "
+            f"stdout: {stdout_content}"
+        )
 
         def mock_glob_side_effect(pattern):
             return [self.partition_1]
@@ -871,7 +882,9 @@ class TestCLI(TestCase):
         self.assertIn("images", results)
         self.assertIn("errors", results)
         self.assertEqual(len(results["errors"]), 1)
-        self.assertIn(error_message, results["errors"][0])
+        self.assertIn(expected_error_message, results["errors"][0])
         self.assertIn(self.aws_image_id, results["images"])
         self.assertEqual(len(results["images"][self.aws_image_id]["errors"]), 1)
-        self.assertIn(error_message, results["images"][self.aws_image_id]["errors"][0])
+        self.assertIn(
+            expected_error_message, results["images"][self.aws_image_id]["errors"][0]
+        )
