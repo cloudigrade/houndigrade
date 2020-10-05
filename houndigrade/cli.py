@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 from contextlib import contextmanager
+from distutils.util import strtobool
 from gettext import gettext as _
 
 import boto3
@@ -158,16 +159,27 @@ def mount_and_inspect(drive, image_id, results):
         image_results["errors"].append(message)
         return
 
-    partitions = get_partitions(drive)
-    if not partitions:
-        message = _("No partitions found at {0} for {1}").format(drive, image_id)
-        click.echo(message, err=True)
-        results["errors"].append(message)
-        image_results["errors"].append(message)
-        return
+    if partitions := get_partitions(drive):
+        for partition in partitions:
+            check_partition(drive, partition, image_id, results)
+    else:
+        click.echo(
+            _("No partitions found on drive {0} for {1}").format(drive, image_id)
+        )
 
-    for partition in partitions:
-        check_partition(drive, partition, image_id, results)
+
+def has_partitions(drive):
+    """
+    Check if the drive has any partitions.
+
+    Args:
+        drive (str): The path to the mounted drive.
+
+    Returns (bool): Whether the drive appears to have partitions or not.
+    """
+    click.echo(_("Checking if drive {drive} has partitions.").format(drive=drive))
+
+    return bool(strtobool(sh.wc(sh.partprobe("-d", "-s", drive), "-l").rstrip()))
 
 
 def check_partition(drive, partition, image_id, results):
@@ -503,7 +515,33 @@ def get_partitions(drive):
     Returns (list): List of file system paths that much the pattern.
 
     """
-    return sorted(glob.glob("{}*[0-9]".format(drive)))
+    click.echo(_("Checking if drive {drive} has partitions.").format(drive=drive))
+    # Before we can really _get_ the partitions, we should
+    # really check and make sure we have any at all.
+    blkid_out = sh.blkid("-p", "-o", "export", drive)
+    blkid_out = blkid_out.rstrip().split("\n")
+    blkid_dict = dict(map(lambda x: x.split("="), blkid_out))
+
+    click.echo(
+        _('Block device attributes for drive "{}"\n"Output:\n" "{}"').format(
+            drive, blkid_dict
+        )
+    )
+
+    if partition_type := blkid_dict.get("PTTYPE"):
+        click.echo(
+            _("Device appears to have partitions, PTTYPE: {}").format(partition_type)
+        )
+        partitions = sorted(glob.glob("{}*[0-9]".format(drive)))
+    elif "filesystem" in blkid_dict.get("USAGE"):
+        click.echo(
+            _("Device appears to lack a partition table, type: {}").format(
+                blkid_dict.get("TYPE", "Not Present")
+            )
+        )
+        partitions = sorted(glob.glob("{}*".format(drive)))
+
+    return partitions
 
 
 def check_file(file_path):

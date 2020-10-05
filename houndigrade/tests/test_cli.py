@@ -161,11 +161,16 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertIn("Error: Missing option '--target' / '-t'.", result.output)
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_multiple_ways(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """
         Test finding RHEL via multiple ways.
@@ -233,6 +238,7 @@ class TestCLI(TestCase):
         )
         self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -290,11 +296,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_cli_no_version_files(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test appropriate error handling when release files are missing."""
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
@@ -315,6 +326,7 @@ class TestCLI(TestCase):
         self.assertNoReleaseFiles(result.output, self.partition_1)
         self.assertNoReleaseFiles(result.output, self.partition_2)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -330,11 +342,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """
         Test not finding RHEL via normal inspection.
@@ -387,6 +404,7 @@ class TestCLI(TestCase):
         # Skip next assert because the RPM check quietly errors out (correctly).
         # self.assertFoundSignedPackages(result.output, self.partition_2, False)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -402,11 +420,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via enabled yum repos."""
         rhel_version = None  # Because we detect RHEL without a release file.
@@ -441,6 +464,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -456,11 +480,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos_specified_dir(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via enabled yum repos in custom yum repos path."""
         rhel_version = None  # Because we detect RHEL without a release file.
@@ -489,6 +518,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -504,11 +534,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_enabled_repos_no_conf(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via enabled yum repos without yum.conf."""
         rhel_version = None  # Because we detect RHEL without a release file.
@@ -539,6 +574,7 @@ class TestCLI(TestCase):
             result.output,
         )
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -554,11 +590,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found_with_bad_yum_conf(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test not finding RHEL with bad yum.conf."""
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
@@ -578,6 +619,7 @@ class TestCLI(TestCase):
         self.assertRhelNotFound(result.output, self.aws_image_id)
         self.assertIn("Error reading yum repo files on", result.output)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -593,11 +635,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_not_found_with_unreadable_release_file(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test not finding RHEL with an unreadable release file."""
         runner = CliRunner()
@@ -616,6 +663,7 @@ class TestCLI(TestCase):
         )
         self.assertRhelNotFound(result.output, self.aws_image_id)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -642,11 +690,16 @@ class TestCLI(TestCase):
             ]["facts"]["rhel_release_files"]["status"],
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_signed_package(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via signed package (RHEL in RPM DB)."""
         rhel_version = None  # Because we detect RHEL without a release file.
@@ -671,6 +724,7 @@ class TestCLI(TestCase):
         self.assertFoundSignedPackages(result.output, self.partition_1)
         self.assertFoundSignedPackages(result.output, self.partition_2, False)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -686,11 +740,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_product_cert(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via product certificate."""
         rhel_version = None  # Because we detect RHEL without a release file.
@@ -713,6 +772,7 @@ class TestCLI(TestCase):
         self.assertFoundProductCertificate(result.output, self.partition_1)
         self.assertFoundProductCertificate(result.output, self.partition_2)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -728,11 +788,16 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.subprocess.check_output")
     def test_rhel_found_via_release_file(
-        self, mock_subprocess_check_output, mock_describe_devices, mock_report_results
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_has_partitions,
     ):
         """Test finding RHEL via etc release file."""
         rhel_version = "7.4"
@@ -755,6 +820,7 @@ class TestCLI(TestCase):
         self.assertFoundReleaseFile(result.output, self.partition_1, True)
         self.assertFoundReleaseFile(result.output, self.partition_2, False)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -771,9 +837,12 @@ class TestCLI(TestCase):
             rhel_version=rhel_version,
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
-    def test_no_rpm_db_early_return(self, mock_describe_devices, mock_report_results):
+    def test_no_rpm_db_early_return(
+        self, mock_describe_devices, mock_report_results, mock_has_partitions
+    ):
         """Test error handling when RPM DB does not exist."""
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
@@ -787,6 +856,7 @@ class TestCLI(TestCase):
 
         self.assertEqual(result.exit_code, 0)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -812,6 +882,7 @@ class TestCLI(TestCase):
             ]["facts"]["rhel_signed_packages"]["status"],
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     @patch("cli.glob.glob")
@@ -824,6 +895,7 @@ class TestCLI(TestCase):
         mock_glob_glob,
         mock_describe_devices,
         mock_report_results,
+        mock_has_partitions,
     ):
         """Test error handling when mount fails."""
         full_cmd = "mount command"
@@ -858,6 +930,7 @@ class TestCLI(TestCase):
         mock_sh_umount.assert_not_called
         self.assertEqual(result.exit_code, 0)
 
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -878,9 +951,12 @@ class TestCLI(TestCase):
             error_messages=[expected_error_message],
         )
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
-    def test_syspurpose_empty(self, mock_describe_devices, mock_report_results):
+    def test_syspurpose_empty(
+        self, mock_describe_devices, mock_report_results, mock_has_partitions
+    ):
         """
         Test error handling when syspurpose.json exists but is empty.
 
@@ -901,14 +977,18 @@ class TestCLI(TestCase):
 
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
-    def test_syspurpose_whitespace(self, mock_describe_devices, mock_report_results):
+    def test_syspurpose_whitespace(
+        self, mock_describe_devices, mock_report_results, mock_has_partitions
+    ):
         """
         Test error handling when syspurpose.json exists but only has whitespace.
 
@@ -928,13 +1008,17 @@ class TestCLI(TestCase):
             )
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(f"System purpose is empty on: {self.partition_1}", result.output)
 
+    @patch("cli.has_partitions")
     @patch("cli.report_results")
     @patch("cli.describe_devices")
-    def test_syspurpose_malformed(self, mock_describe_devices, mock_report_results):
+    def test_syspurpose_malformed(
+        self, mock_describe_devices, mock_report_results, mock_has_partitions
+    ):
         """
         Test error handling when syspurpose.json exists but has non-JSON content.
 
@@ -954,6 +1038,7 @@ class TestCLI(TestCase):
             )
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_has_partitions.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(
