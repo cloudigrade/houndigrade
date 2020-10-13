@@ -6,7 +6,6 @@ import os
 import subprocess
 import sys
 from contextlib import contextmanager
-from distutils.util import strtobool
 from gettext import gettext as _
 
 import boto3
@@ -166,20 +165,6 @@ def mount_and_inspect(drive, image_id, results):
         click.echo(
             _("No partitions found on drive {0} for {1}").format(drive, image_id)
         )
-
-
-def has_partitions(drive):
-    """
-    Check if the drive has any partitions.
-
-    Args:
-        drive (str): The path to the mounted drive.
-
-    Returns (bool): Whether the drive appears to have partitions or not.
-    """
-    click.echo(_("Checking if drive {drive} has partitions.").format(drive=drive))
-
-    return bool(strtobool(sh.wc(sh.partprobe("-d", "-s", drive), "-l").rstrip()))
 
 
 def check_partition(drive, partition, image_id, results):
@@ -520,7 +505,7 @@ def get_partitions(drive):
     # really check and make sure we have any at all.
     blkid_out = sh.blkid("-p", "-o", "export", drive)
     blkid_out = blkid_out.rstrip().split("\n")
-    blkid_dict = dict(map(lambda x: x.split("="), blkid_out))
+    blkid_dict = dict(map(lambda x: x.split("=", 1), blkid_out))
 
     click.echo(
         _('Block device attributes for drive "{}"\n"Output:\n" "{}"').format(
@@ -533,11 +518,19 @@ def get_partitions(drive):
             _("Device appears to have partitions, PTTYPE: {}").format(partition_type)
         )
         partitions = sorted(glob.glob("{}*[0-9]".format(drive)))
-    elif "filesystem" in blkid_dict.get("USAGE"):
+    elif "filesystem" in blkid_dict.get("USAGE", ""):
         click.echo(
             _("Device appears to lack a partition table, type: {}").format(
                 blkid_dict.get("TYPE", "Not Present")
             )
+        )
+        partitions = sorted(glob.glob("{}*".format(drive)))
+    else:
+        click.echo(
+            _(
+                "We're not sure what this device is, assuming "
+                "lack of partition table, blkid output:\n{}"
+            ).format(blkid_dict)
         )
         partitions = sorted(glob.glob("{}*".format(drive)))
 
