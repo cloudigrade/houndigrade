@@ -161,6 +161,10 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertIn("Error: Missing option '--target' / '-t'.", result.output)
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -171,6 +175,10 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test finding RHEL via multiple ways.
@@ -182,6 +190,8 @@ class TestCLI(TestCase):
         * RHEL in at least one partition's installed product certificate(s)
         * RHEL in at least one partition's RPM database
         """
+        mock_is_lvm.return_value = False
+
         rhel_version = "7.4"
 
         mock_subprocess_check_output.side_effect = [
@@ -239,6 +249,10 @@ class TestCLI(TestCase):
         self.assertIn('"role": "Red Hat Enterprise Linux Server"', result.output)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -296,6 +310,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -306,8 +324,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test appropriate error handling when release files are missing."""
+        mock_is_lvm.return_value = False
+
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
         runner = CliRunner()
@@ -327,6 +351,10 @@ class TestCLI(TestCase):
         self.assertNoReleaseFiles(result.output, self.partition_2)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -342,6 +370,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -352,6 +384,10 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test not finding RHEL via normal inspection.
@@ -367,6 +403,8 @@ class TestCLI(TestCase):
         * no RHEL found in the RPM database
         * rpm command fails to execute
         """
+        mock_is_lvm.return_value = False
+
         subprocess_error = CalledProcessError(1, "rpm", stderr="rpm failed.")
         mock_subprocess_check_output.side_effect = [
             RPM_RESULT_NONE,  # result for `rpm` call in partition_1
@@ -405,6 +443,10 @@ class TestCLI(TestCase):
         # self.assertFoundSignedPackages(result.output, self.partition_2, False)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -420,6 +462,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -430,8 +476,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via enabled yum repos."""
+        mock_is_lvm.return_value = False
+
         rhel_version = None  # Because we detect RHEL without a release file.
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
@@ -467,6 +519,10 @@ class TestCLI(TestCase):
         )
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -482,6 +538,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -492,8 +552,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via enabled yum repos in custom yum repos path."""
+        mock_is_lvm.return_value = False
+
         rhel_version = None  # Because we detect RHEL without a release file.
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
@@ -525,6 +591,10 @@ class TestCLI(TestCase):
         )
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -540,6 +610,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -550,8 +624,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via enabled yum repos without yum.conf."""
+        mock_is_lvm.return_value = False
+
         rhel_version = None  # Because we detect RHEL without a release file.
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
@@ -585,6 +665,10 @@ class TestCLI(TestCase):
         )
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -600,6 +684,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -610,8 +698,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test not finding RHEL with bad yum.conf."""
+        mock_is_lvm.return_value = False
+
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
         runner = CliRunner()
@@ -630,6 +724,10 @@ class TestCLI(TestCase):
         self.assertIn("Error reading yum repo files on", result.output)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -645,6 +743,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -655,8 +757,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test not finding RHEL with an unreadable release file."""
+        mock_is_lvm.return_value = False
+
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
             "cli.mount", helper.fake_mount(tempdir_path)
@@ -674,6 +782,10 @@ class TestCLI(TestCase):
         self.assertRhelNotFound(result.output, self.aws_image_id)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -700,6 +812,10 @@ class TestCLI(TestCase):
             ]["facts"]["rhel_release_files"]["status"],
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -710,8 +826,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via signed package (RHEL in RPM DB)."""
+        mock_is_lvm.return_value = False
+
         rhel_version = None  # Because we detect RHEL without a release file.
         mock_subprocess_check_output.side_effect = [
             RPM_RESULT_FOUND,  # result for `rpm` call in partition_1
@@ -735,6 +857,10 @@ class TestCLI(TestCase):
         self.assertFoundSignedPackages(result.output, self.partition_2, False)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -750,6 +876,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -760,8 +890,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via product certificate."""
+        mock_is_lvm.return_value = False
+
         rhel_version = None  # Because we detect RHEL without a release file.
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
 
@@ -783,6 +919,10 @@ class TestCLI(TestCase):
         self.assertFoundProductCertificate(result.output, self.partition_2)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -798,6 +938,10 @@ class TestCLI(TestCase):
             rhel_release_files_found=False,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -808,8 +952,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test finding RHEL via etc release file."""
+        mock_is_lvm.return_value = False
+
         rhel_version = "7.4"
 
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
@@ -831,6 +981,10 @@ class TestCLI(TestCase):
         self.assertFoundReleaseFile(result.output, self.partition_2, False)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -847,13 +1001,108 @@ class TestCLI(TestCase):
             rhel_version=rhel_version,
         )
 
+    @patch("cli.sh.udevadm", create=True)
+    @patch("cli.sh.tail", create=True)
+    @patch("cli.sh.lvdisplay", create=True)
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
+    @patch("cli.sh.blkid", create=True)
+    @patch("cli.report_results")
+    @patch("cli.describe_devices")
+    @patch("cli.subprocess.check_output")
+    def test_rhel_found_via_release_file_on_lvm(
+        self,
+        mock_subprocess_check_output,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_lvdisplay,
+        mock_tail,
+        mock_udevadm,
+    ):
+        """Test finding RHEL via etc release file on an lvm lv."""
+        mock_sh_blkid.return_value = """DEVNAME=/dev/loop10
+PTUUID=98a48d3a
+PTTYPE=dos
+"""
+        mock_udevadm.return_value = """ID_FS_TYPE=LVM2_member
+ID_FS_VERSION=LVM2 001
+"""
+        lv_path = "./dev/mapper/rhel_vg-rhel_lv"
+        mock_tail.return_value = [lv_path]
+        mock_subprocess_check_output.return_value = RPM_RESULT_NONE
+
+        rhel_version = "7.4"
+
+        runner = CliRunner()
+        with runner.isolated_filesystem() as tempdir_path, patch(
+            "cli.mount", helper.fake_mount(tempdir_path)
+        ), patch("cli.INSPECT_PATH", self.inspect_path):
+            helper.prepare_fs_empty(self.drive_path)
+            helper.prepare_fs_empty(self.partition_1)
+            helper.prepare_fs_empty(self.partition_2)
+            helper.prepare_fs_empty(lv_path)
+            helper.prepare_fs_rhel_release(lv_path)
+            result = runner.invoke(
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
+            )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        self.assertFoundReleaseFile(result.output, lv_path, True)
+
+        mock_sh_blkid.assert_called_once_with("-p", "-o", "export", self.drive_path)
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_with("--mknodes")
+        mock_lvdisplay.assert_called_once_with("-C", "-o", "lv_path")
+        mock_tail.assert_called_once()
+        mock_udevadm.assert_any_call(
+            "info", "--query=property", f"--name={self.partition_1}"
+        )
+        mock_udevadm.assert_any_call(
+            "info", "--query=property", f"--name={self.partition_2}"
+        )
+        mock_describe_devices.assert_called_once()
+        mock_report_results.assert_called_once()
+        results = mock_report_results.call_args[0][0]
+
+        self.assertReportResultsStructure(results, image_ids=[self.aws_image_id])
+        self.assertReportResultsImageDetails(
+            results,
+            image_id=self.aws_image_id,
+            rhel_found=True,
+            rhel_signed_packages_found=False,
+            rhel_enabled_repos_found=False,
+            rhel_product_certs_found=False,
+            rhel_release_files_found=True,
+            rhel_version=rhel_version,
+        )
+
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     def test_no_rpm_db_early_return(
-        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+        self,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test error handling when RPM DB does not exist."""
+        mock_is_lvm.return_value = False
+
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
             "cli.mount", helper.fake_mount(tempdir_path)
@@ -867,6 +1116,10 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -892,6 +1145,10 @@ class TestCLI(TestCase):
             ]["facts"]["rhel_signed_packages"]["status"],
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
@@ -906,8 +1163,14 @@ class TestCLI(TestCase):
         mock_describe_devices,
         mock_report_results,
         mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """Test error handling when mount fails."""
+        mock_is_lvm.return_value = False
+
         full_cmd = "mount command"
         stdout_content = b"this is stdout"
         stderr_content = b"and this is stderr"
@@ -941,6 +1204,10 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
 
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
@@ -961,17 +1228,30 @@ class TestCLI(TestCase):
             error_messages=[expected_error_message],
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     def test_syspurpose_empty(
-        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+        self,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test error handling when syspurpose.json exists but is empty.
 
         Note: We have to detect RHEL before we parse the syspurpose.json file.
         """
+        mock_is_lvm.return_value = False
+
         rhel_version = "7.4"
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
@@ -988,22 +1268,39 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         results = mock_report_results.call_args[0][0]
         self.assertIsNone(results["images"][self.aws_image_id]["syspurpose"])
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     def test_syspurpose_whitespace(
-        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+        self,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test error handling when syspurpose.json exists but only has whitespace.
 
         Note: We have to detect RHEL before we parse the syspurpose.json file.
         """
+        mock_is_lvm.return_value = False
+
         rhel_version = "7.4"
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
@@ -1019,21 +1316,38 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(f"System purpose is empty on: {self.partition_1}", result.output)
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     def test_syspurpose_malformed(
-        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+        self,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test error handling when syspurpose.json exists but has non-JSON content.
 
         Note: We have to detect RHEL before we parse the syspurpose.json file.
         """
+        mock_is_lvm.return_value = False
+
         rhel_version = "7.4"
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
@@ -1049,6 +1363,10 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(
@@ -1056,17 +1374,29 @@ class TestCLI(TestCase):
             result.output,
         )
 
+    @patch("cli.is_lvm")
+    @patch("cli.sh.vgscan", create=True)
+    @patch("cli.sh.lvscan", create=True)
+    @patch("cli.sh.vgchange", create=True)
     @patch("cli.sh.blkid", create=True)
     @patch("cli.report_results")
     @patch("cli.describe_devices")
     def test_large_syspurpose(
-        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+        self,
+        mock_describe_devices,
+        mock_report_results,
+        mock_sh_blkid,
+        mock_vgchange,
+        mock_lvscan,
+        mock_vgscan,
+        mock_is_lvm,
     ):
         """
         Test skipping of syspurpose.json when the size is larger than 1K bytes.
 
         Note: We create a 2K size syspurpose.json file for this test.
         """
+        mock_is_lvm.return_value = False
         rhel_version = "7.4"
         runner = CliRunner()
         with runner.isolated_filesystem() as tempdir_path, patch(
@@ -1082,6 +1412,10 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         mock_sh_blkid.assert_called_once()
+        mock_vgchange.assert_called_once_with("-a", "y")
+        mock_lvscan.assert_called_once()
+        mock_vgscan.assert_called_once()
+        mock_is_lvm.assert_called_once()
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(

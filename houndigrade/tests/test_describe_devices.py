@@ -10,7 +10,9 @@ class TestDescribeDevices(TestCase):
     @patch("cli.get_partitions")
     @patch("cli.sh")
     def test_describe_devices(
-        self, mock_sh, mock_get_partitions,
+        self,
+        mock_sh,
+        mock_get_partitions,
     ):
         """Assert various expected sh calls for describe_devices."""
         from cli import describe_devices

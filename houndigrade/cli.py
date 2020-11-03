@@ -161,6 +161,17 @@ def mount_and_inspect(drive, image_id, results):
         return
 
     if partitions := get_partitions(drive):
+        if lvm_partitions := is_lvm(partitions):
+            partitions = [i for i in partitions if i not in lvm_partitions]
+            partitions.extend(fetch_lv_paths())
+
+            # Make sure all the nodes are created
+            click.echo(sh.vgscan("--mknodes"))
+
+        click.echo(
+            _("Found following partitions on drive {0}: {1}").format(drive, partitions)
+        )
+
         for partition in partitions:
             check_partition(drive, partition, image_id, results)
     else:
@@ -251,7 +262,9 @@ def check_partition(drive, partition, image_id, results):
                         "RHEL (version {os_version}) found on: {image_id} "
                         "in {partition}"
                     ).format(
-                        os_version=os_version, image_id=image_id, partition=partition,
+                        os_version=os_version,
+                        image_id=image_id,
+                        partition=partition,
                     )
                 )
             else:
@@ -295,7 +308,12 @@ def mount(partition, inspect_path):
     """
     click.echo(_("Mounting {}.").format(partition))
     mount_result = sh.mount(
-        "-t", "auto", "{}".format(partition), "{}".format(inspect_path)
+        "-t",
+        "auto",
+        "-o",
+        "ro,noload",
+        "{}".format(partition),
+        "{}".format(inspect_path),
     )
     click.echo(_("Mounting result {}.").format(mount_result.exit_code))
     yield mount_result
@@ -503,6 +521,12 @@ def get_partitions(drive):
 
     """
     click.echo(_("Checking if drive {drive} has partitions.").format(drive=drive))
+
+    # Scan and activate all volume groups in case of LVM
+    click.echo(sh.vgscan())
+    click.echo(sh.lvscan())
+    click.echo(sh.vgchange("-a", "y"))
+
     # Before we can really _get_ the partitions, we should
     # really check and make sure we have any at all.
     blkid_out = sh.blkid("-p", "-o", "export", drive)
@@ -510,7 +534,7 @@ def get_partitions(drive):
     blkid_dict = dict(map(lambda x: x.split("=", 1), blkid_out))
 
     click.echo(
-        _('Block device attributes for drive "{}"\n"Output:\n" "{}"').format(
+        _('Block device attributes for drive "{}"\n"Output:"\n"{}"').format(
             drive, blkid_dict
         )
     )
@@ -537,6 +561,52 @@ def get_partitions(drive):
         partitions = sorted(glob.glob("{}*".format(drive)))
 
     return partitions
+
+
+def is_lvm(partitions):
+    """
+    Determine if LVM is present on any of the provided partitions.
+
+    Args:
+        partitions: list of partitions to be checked.
+
+    Returns:
+        set: of partitions containing LVM metadata.
+
+    """
+    partition_info = {}
+    lvm_partitions = set()
+
+    for partition in partitions:
+        udevadm_out = sh.udevadm("info", "--query=property", f"--name={partition}")
+        properties = dict(
+            map(str.strip, prop.split("=", 1))
+            for prop in udevadm_out.split("\n")
+            if "=" in prop
+        )
+        partition_info[partition] = properties
+
+    for partition, properties in partition_info.items():
+        if properties.get("ID_FS_TYPE") == "LVM2_member":
+            lvm_partitions.add(partition)
+        if "LVM2" in properties.get("ID_FS_VERSION"):
+            lvm_partitions.add(partition)
+
+    return lvm_partitions
+
+
+def fetch_lv_paths():
+    """
+    Fetch paths for all available LVs.
+
+    Returns:
+        list: of LV paths.
+
+    """
+    lvdisplay_out = sh.tail(sh.lvdisplay("-C", "-o", "lv_path"), "-n", "+2")
+    lv_paths = [path.strip() for path in lvdisplay_out]
+
+    return lv_paths
 
 
 def check_file(file_path):
