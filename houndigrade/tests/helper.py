@@ -115,6 +115,7 @@ def prepare_fs_with_yum(
     include_yum_conf=True,
     include_optional=True,
     default_reposdir=True,
+    use_dnf=False,
 ):
     """
     Prepare a filesystem directory with a yum config and repo(s).
@@ -133,7 +134,10 @@ def prepare_fs_with_yum(
         yum_conf_data = (
             data.YUM_CONF if default_reposdir else data.YUM_CONF_WITH_REPOSDIR
         )
-        write_data(yum_conf_data, f"{etc_path}/yum.conf")
+        if use_dnf:
+            write_data(yum_conf_data, f"{etc_path}/dnf/dnf.conf")
+        else:
+            write_data(yum_conf_data, f"{etc_path}/yum.conf")
 
     rhel_repo_path = f"{repos_path}/rhel7-internal.repo"
     rhel_repo_data = (

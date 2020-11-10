@@ -630,36 +630,100 @@ def parse_syspurpose(syspurpose, partition):
     return None
 
 
-def find_yum_repos_via_config(partition):
+def find_repos_via_config(partition):
     """
-    Find all of the files that might contain repo information.
+    Find .repo files by checking package manager configuration files.
 
-    Returns (list): A list of file paths to any files that might contain
-        repo information
+    Returns:
+        list: of found .repo files, or an empty list of none are found.
 
     """
-    # if not specified in the yum config the default repos dir is
-    # INSPECT_PATH/etc/yum.repos.d
-    repo_file_dir = "{}/etc/yum.repos.d".format(INSPECT_PATH)
-    yum_config_path = glob.glob("{}/etc/yum.conf".format(INSPECT_PATH))
-    if yum_config_path:
-        # check the yum config file to get any specified path to the
-        # yum repo directory
-        parser = configparser.ConfigParser()
-        parser.read(yum_config_path[0])
-        if parser["main"].get("reposdir"):
-            repo_file_dir = "{}{}".format(INSPECT_PATH, parser["main"]["reposdir"])
-    else:
-        click.echo(_("No yum.conf file found on: {}").format(partition))
-    # now get all of the .repo files within
-    repo_files = glob.glob("{}/*.repo".format(repo_file_dir))
+    # check if dnf or yum
+    repo_file_dirs, dnf_config_path, yum_config_path = find_repo_file_dirs()
+
+    click.echo(_("Found following repo_file_dirs: {}").format(repo_file_dirs))
+
+    repo_files = []
+    for repo_file_dir in repo_file_dirs:
+        repo_files.extend(glob.glob("{}/*.repo".format(repo_file_dir)))
+
     if not repo_files:
         click.echo(_("No .repo files found on: {}").format(partition))
+    else:
+        click.echo(
+            _('Found following .repo files on "{}": {}').format(partition, repo_files)
+        )
     # it is also possible to list repos inside of the yum.conf file so we
     # want to add it to the list of files to check if it exists
+    if dnf_config_path:
+        repo_files.append(dnf_config_path)
     if yum_config_path:
-        repo_files.append(yum_config_path[0])
+        repo_files.append(yum_config_path)
+
+    click.echo(
+        _('Final list of .repo file dirs being checked on "{}": {}').format(
+            partition, repo_files
+        )
+    )
+
     return repo_files
+
+
+def find_repo_file_dirs():
+    """
+    Check package manager config files for defined .repo file dirs.
+
+    Returns:
+        list, str, str: representing the list of .repo dirs along with
+            dnf and yum config paths if present.
+
+    """
+    repo_dirs = []
+
+    if dnf_config_path := glob.glob("{}/etc/dnf/dnf.conf".format(INSPECT_PATH)):
+        click.echo(_("Found following dnf config path(s): {}").format(dnf_config_path))
+        dnf_config_path = dnf_config_path[0]
+        repo_dirs.extend(read_reposdir_value_from_config(dnf_config_path))
+    if yum_config_path := glob.glob("{}/etc/yum.conf".format(INSPECT_PATH)):
+        click.echo(_("Found following yum config path(s): {}").format(yum_config_path))
+        yum_config_path = yum_config_path[0]
+        repo_dirs.extend(read_reposdir_value_from_config(yum_config_path))
+
+    # Always check the dnf/yum default.
+    repo_dirs.extend(glob.glob("{}/etc/yum.repos.d".format(INSPECT_PATH)))
+
+    return repo_dirs, dnf_config_path, yum_config_path
+
+
+def read_reposdir_value_from_config(config_path):
+    """
+    Check a given configuration file for a configured reposdir value.
+
+    Args:
+        config_path (str): Path of the configuration file to inspect.
+
+    Returns:
+        list: of configured repo_dirs, empty if not configured.
+
+    """
+    parser = configparser.ConfigParser(
+        converters={"list": lambda x: [i.strip() for i in x.split(",")]}
+    )
+    parser.read(config_path)
+
+    # Why .getlist now instead of .get? In yum this was a single directory,
+    # in dnf this can be a list of directories. This allows us to support both.
+    if repo_dirs := parser["main"].getlist("reposdir"):
+        repo_dirs = list(map(lambda x: "{}{}".format(INSPECT_PATH, x), repo_dirs))
+        click.echo(
+            _("Found the following repo directories defined in {}: {}").format(
+                config_path, repo_dirs
+            )
+        )
+        return repo_dirs
+    else:
+        click.echo(_('No "reposdir" defined in {}').format(config_path))
+        return []
 
 
 def check_repo_files(file_paths):
@@ -696,7 +760,7 @@ def check_repo_files(file_paths):
 
 def check_enabled_repos(partition, results):
     """
-    Check the partition for any yum enabled RHEL repos.
+    Check the partition for any enabled RHEL repos.
 
     Args:
         partition (str): The partition we are currently checking.
@@ -706,14 +770,19 @@ def check_enabled_repos(partition, results):
     """
     results[RHEL_FOUND] = False
     try:
-        repo_files = find_yum_repos_via_config(partition)
-        rhel_repos = check_repo_files(repo_files)
-        if rhel_repos:
-            results[RHEL_FOUND] = True
-            click.echo(_("RHEL found via enabled repos on: {}").format(partition))
+        repo_files = find_repos_via_config(partition)
+        if repo_files:
+            rhel_repos = check_repo_files(repo_files)
+            if rhel_repos:
+                results[RHEL_FOUND] = True
+                results["rhel_enabled_repos"] = rhel_repos
+                click.echo(_("RHEL found via enabled repos on: {}").format(partition))
+            else:
+                click.echo(
+                    _("RHEL not found via enabled repos on: {}").format(partition)
+                )
         else:
             click.echo(_("RHEL not found via enabled repos on: {}").format(partition))
-        results["rhel_enabled_repos"] = rhel_repos
     except Exception as e:
         message = _("Error reading yum repo files on {}: {}").format(partition, e)
         click.echo(message, err=True)

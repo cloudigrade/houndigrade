@@ -442,6 +442,7 @@ class TestCLI(TestCase):
             helper.prepare_fs_empty(self.drive_path)
             helper.prepare_fs_with_yum(self.partition_1)
             helper.prepare_fs_with_yum(self.partition_2, include_optional=False)
+            helper.prepare_fs_with_yum(self.partition_3, use_dnf=True)
             result = runner.invoke(
                 main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
@@ -450,6 +451,7 @@ class TestCLI(TestCase):
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         self.assertFoundEnabledRepos(result.output, self.partition_1)
         self.assertFoundEnabledRepos(result.output, self.partition_2)
+        self.assertFoundEnabledRepos(result.output, self.partition_3)
 
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
@@ -501,6 +503,9 @@ class TestCLI(TestCase):
         ), patch("cli.INSPECT_PATH", self.inspect_path):
             helper.prepare_fs_empty(self.drive_path)
             helper.prepare_fs_with_yum(self.partition_1, default_reposdir=False)
+            helper.prepare_fs_with_yum(
+                self.partition_2, default_reposdir=False, use_dnf=True
+            )
             result = runner.invoke(
                 main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
@@ -508,6 +513,7 @@ class TestCLI(TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         self.assertFoundEnabledRepos(result.output, self.partition_1)
+        self.assertFoundEnabledRepos(result.output, self.partition_2)
 
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
@@ -556,6 +562,9 @@ class TestCLI(TestCase):
             helper.prepare_fs_empty(self.drive_path)
             helper.prepare_fs_with_yum(self.partition_1, include_yum_conf=False)
             helper.prepare_fs_with_yum(self.partition_2, include_yum_conf=False)
+            helper.prepare_fs_with_yum(
+                self.partition_3, include_yum_conf=False, use_dnf=True
+            )
             result = runner.invoke(
                 main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
             )
@@ -564,6 +573,7 @@ class TestCLI(TestCase):
         self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
         self.assertFoundEnabledRepos(result.output, self.partition_1)
         self.assertFoundEnabledRepos(result.output, self.partition_2)
+        self.assertFoundEnabledRepos(result.output, self.partition_3)
 
         self.assertIn(
             '{"repo": "rhel7-cdn-internal", "name": "RHEL 7 - $basearch"}',
