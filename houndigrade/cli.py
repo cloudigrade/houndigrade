@@ -1,5 +1,6 @@
 """Command line script for inspecting attached volumes."""
 import configparser
+import csv
 import glob
 import json
 import os
@@ -706,10 +707,7 @@ def read_reposdir_value_from_config(config_path):
         list: of configured repo_dirs, empty if not configured.
 
     """
-    parser = configparser.ConfigParser(
-        converters={"list": lambda x: [i.strip() for i in x.split(",")]}
-    )
-    parser.read(config_path)
+    parser = read_config(config_path)
 
     # Why .getlist now instead of .get? In yum this was a single directory,
     # in dnf this can be a list of directories. This allows us to support both.
@@ -724,6 +722,30 @@ def read_reposdir_value_from_config(config_path):
     else:
         click.echo(_('No "reposdir" defined in {}').format(config_path))
         return []
+
+
+def read_config(config_path):
+    """
+    Parse the configuration file, returning an instance of the prepped parser.
+
+    Args:
+        config_path (str): Path of the configuration file to inspect.
+
+    Returns:
+        configparser.ConfigParser: that has parsed the configuration file.
+
+    """
+    parser = configparser.ConfigParser(
+        # converters={"list": lambda x: [i.strip() for i in x.split("(?<!\\\\),")]}
+        converters={
+            "list": lambda x: [
+                "{}".format(x) for x in list(csv.reader([x], delimiter=","))[0]
+            ]
+        }
+    )
+    parser.read(config_path)
+
+    return parser
 
 
 def check_repo_files(file_paths):
