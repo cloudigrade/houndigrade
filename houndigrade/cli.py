@@ -736,7 +736,6 @@ def read_config(config_path):
 
     """
     parser = configparser.ConfigParser(
-        # converters={"list": lambda x: [i.strip() for i in x.split("(?<!\\\\),")]}
         converters={
             "list": lambda x: [
                 "{}".format(x) for x in list(csv.reader([x], delimiter=","))[0]
