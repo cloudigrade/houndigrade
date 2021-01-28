@@ -1,3 +1,3 @@
 [submodule "test-data"]
 	path = test-data
-	url = https://gitlab.com/cloudigrade/houndigrade-test-data.git
+	url = https://github.com/cloudigrade/houndigrade-test-data.git
