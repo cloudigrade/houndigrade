@@ -45,7 +45,7 @@ jobs:
 
   deploy-build-and-push-image:
     name: Build and Push Image
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     needs: [test-py38, test-flake8, test-docker]
     runs-on: ubuntu-latest
     container:
