@@ -2,7 +2,7 @@ name: Houndigrade CI/CD flow
 
 env:
   IMAGE_NAME: docker.pkg.github.com/${{ github.repository }}/houndigrade
-  IMAGE_NAME_COMMIT: docker.pkg.github.com/${{ github.repository }}/commits/houndigrade:${{ github.sha }}
+  IMAGE_NAME_COMMIT: docker.pkg.github.com/${{ github.repository }}/houndigrade:${{ github.sha }}
 
 on:
   push:
