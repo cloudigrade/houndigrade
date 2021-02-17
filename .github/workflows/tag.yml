@@ -1,0 +1,76 @@
+name: Tag
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/houndigrade
+  IMAGE_NAME_COMMIT: ghcr.io/${{ github.repository_owner }}/houndigrade:${{ github.sha }}
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  test-py38:
+    name: py38
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.8
+    steps:
+      - uses: actions/checkout@v2
+      - run: pip install tox codecov poetry
+      - run: tox -e py38
+      - run: codecov
+
+  test-flake8:
+    name: flake8
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.8
+    steps:
+      - uses: actions/checkout@v2
+      - run: pip install tox poetry
+      - run: tox -e flake8
+
+  test-docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    container:
+      image: docker:latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker pull $IMAGE_NAME:latest || true
+      - run: docker build --cache-from $IMAGE_NAME:latest .
+
+  deploy-build-and-push-tagged-image:
+    name: Build and Push Tagged Image
+    env:
+      COMMIT_TAG: ${{ github.event.release.tag_name }}
+      GHCR_BOT_USERNAME: ${{ secrets.GHCR_BOT_USERNAME }}
+      GHCR_BOT_TOKEN: ${{ secrets.GHCR_BOT_TOKEN }}
+    needs: [test-py38, test-flake8, test-docker]
+    runs-on: ubuntu-latest
+    container:
+      image: docker:latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "${GHCR_BOT_TOKEN}" | docker login ghcr.io -u ${GHCR_BOT_USERNAME} --password-stdin
+      - run: docker pull $IMAGE_NAME:latest || true
+      - run: docker build --cache-from ${IMAGE_NAME}:latest --tag ${IMAGE_NAME}:${COMMIT_TAG} .
+      - run: docker push ${IMAGE_NAME}:${COMMIT_TAG}
+
+  deploy-trigger-quay-copy:
+    name: Trigger ghcr to quay copy
+    env:
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+    needs: [deploy-build-and-push-tagged-image]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cloudigrade/build-container:latest
+    steps:
+      - name: Webhook
+        uses: distributhor/workflow-webhook@v1.0.5
+        env:
+          webhook_type: "json-extended"
+          webhook_url: "https://ci.ext.devshift.net/github-webhook/"
+          webhook_secret: ${{ secrets.WEBHOOK_SECRET }}  # Does not matter, but provided because it is required.
+
