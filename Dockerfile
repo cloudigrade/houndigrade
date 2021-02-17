@@ -7,7 +7,8 @@ WORKDIR /opt/houndigrade
 COPY poetry.lock .
 COPY pyproject.toml .
 
-RUN apk --no-cache --update add util-linux lvm2 udev gcc libffi-dev musl-dev openssl-dev \
+RUN apk --no-cache --update add util-linux lvm2 udev gcc libffi-dev musl-dev openssl-dev cargo \
+    && pip install -U pip \
     && pip install poetry \
     && poetry config virtualenvs.in-project true \
     && poetry install -n --no-dev
