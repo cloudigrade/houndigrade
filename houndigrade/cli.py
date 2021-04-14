@@ -251,9 +251,7 @@ def check_partition(drive, partition, image_id, results):
                         "RHEL (version {os_version}) found on: {image_id} "
                         "in {partition}"
                     ).format(
-                        os_version=os_version,
-                        image_id=image_id,
-                        partition=partition,
+                        os_version=os_version, image_id=image_id, partition=partition,
                     )
                 )
             else:
@@ -605,9 +603,9 @@ def get_syspurpose(partition):
         try:
             if os.path.getsize(syspurpose_file_path[0]) > SYSPURPOSE_FILESIZE_LIMIT:
                 click.echo(
-                    _("Skipping syspurpose file, file is larger than {0} bytes").format(
-                        SYSPURPOSE_FILESIZE_LIMIT
-                    )
+                    _(
+                        "Skipping system purpose file, file is larger than {0} bytes"
+                    ).format(SYSPURPOSE_FILESIZE_LIMIT)
                 )
                 return None
             with open(syspurpose_file_path[0]) as f:

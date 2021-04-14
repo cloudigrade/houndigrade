@@ -1085,6 +1085,6 @@ class TestCLI(TestCase):
         mock_describe_devices.assert_called_once()
         mock_report_results.assert_called_once()
         self.assertIn(
-            "Skipping syspurpose file, file is larger than 1024 bytes",
+            "Skipping system purpose file, file is larger than 1024 bytes",
             result.output,
         )
