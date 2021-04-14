@@ -251,7 +251,9 @@ def check_partition(drive, partition, image_id, results):
                         "RHEL (version {os_version}) found on: {image_id} "
                         "in {partition}"
                     ).format(
-                        os_version=os_version, image_id=image_id, partition=partition,
+                        os_version=os_version,
+                        image_id=image_id,
+                        partition=partition,
                     )
                 )
             else:
