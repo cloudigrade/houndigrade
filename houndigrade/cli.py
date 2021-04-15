@@ -29,6 +29,7 @@ RH_KEY_IDS = [
     "7514f77d8366b0d9",
     "45689c882fa658e0",
 ]
+SYSPURPOSE_FILESIZE_LIMIT = 1024
 
 
 @click.command()
@@ -591,7 +592,8 @@ def get_syspurpose(partition):
     Get the syspurpose.json (system purpose) file contents if present.
 
     Returns:
-         str containing the contents of syspurpose.json or None if not found or empty.
+         str containing the contents of syspurpose.json or None if not found,
+         empty or larger than 1K.
 
     """
     syspurpose_file_path = glob.glob(
@@ -599,6 +601,13 @@ def get_syspurpose(partition):
     )
     if syspurpose_file_path:
         try:
+            if os.path.getsize(syspurpose_file_path[0]) > SYSPURPOSE_FILESIZE_LIMIT:
+                click.echo(
+                    _(
+                        "Skipping system purpose file, file is larger than {0} bytes"
+                    ).format(SYSPURPOSE_FILESIZE_LIMIT)
+                )
+                return None
             with open(syspurpose_file_path[0]) as f:
                 file_contents = f.read()
             return file_contents if file_contents else None

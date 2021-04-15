@@ -1055,3 +1055,36 @@ class TestCLI(TestCase):
             f"Parsing system purpose on {self.partition_1} failed because",
             result.output,
         )
+
+    @patch("cli.sh.blkid", create=True)
+    @patch("cli.report_results")
+    @patch("cli.describe_devices")
+    def test_large_syspurpose(
+        self, mock_describe_devices, mock_report_results, mock_sh_blkid
+    ):
+        """
+        Test skipping of syspurpose.json when the size is larger than 1K bytes.
+
+        Note: We create a 2K size syspurpose.json file for this test.
+        """
+        rhel_version = "7.4"
+        runner = CliRunner()
+        with runner.isolated_filesystem() as tempdir_path, patch(
+            "cli.mount", helper.fake_mount(tempdir_path)
+        ), patch("cli.INSPECT_PATH", self.inspect_path):
+            helper.prepare_fs_empty(self.drive_path)
+            helper.prepare_fs_rhel_release(self.partition_1)
+            helper.prepare_fs_rhel_syspurpose(self.partition_1, content="x" * 2048)
+
+            result = runner.invoke(
+                main, ["-c", CLOUD_AWS, "-t", self.aws_image_id, self.drive_path]
+            )
+        self.assertEqual(result.exit_code, 0)
+        self.assertRhelFound(result.output, rhel_version, self.aws_image_id)
+        mock_sh_blkid.assert_called_once()
+        mock_describe_devices.assert_called_once()
+        mock_report_results.assert_called_once()
+        self.assertIn(
+            "Skipping system purpose file, file is larger than 1024 bytes",
+            result.output,
+        )
