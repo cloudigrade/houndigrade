@@ -149,3 +149,16 @@ If you want to manually run houndigrade in AWS so that you can watch its output 
         -t ami-12345678900000000 /dev/sdg
 
 You will need to set appropriate values for the `-e` variables passed into the environment, each of the `-t` arguments that define the inspection targets, and the specific version of the houndigrade image you wish to use. When you attach volumes in AWS, you can define the device paths they'll use, and they should match your target arguments here. Alternatively, you can describe the running EC2 instance to get the device paths.
+
+# Releasing Houndigrade
+
+Releasing houndigrade is a simple process of tagging a new version in GitHub. 
+
+1. Navigate to the [releases page](https://github.com/cloudigrade/houndigrade/releases)
+2. Draft a new release
+3. Check the [Pull Requests page](https://github.com/cloudigrade/houndigrade/pulls) to see all the new changes since the last release
+4. For Tag Version we use [Semantic Versioning](https://semver.org/)
+5. For the main release body, please include merged PRs that will be part of this release, ideally linking to the PR itself.
+6. Press button, receive release. The [tag github actions workflow](https://github.com/cloudigrade/houndigrade/blob/master/.github/workflows/tag.yml) will test, build, tag, and get the image copied to quay.
+
+You will find your image in both the [Github Container Registry](https://github.com/orgs/cloudigrade/packages/container/package/houndigrade) and in [Quay.io](https://quay.io/repository/cloudservices/houndigrade)
