@@ -159,6 +159,6 @@ Releasing houndigrade is a simple process of tagging a new version in GitHub.
 3. Check the [Pull Requests page](https://github.com/cloudigrade/houndigrade/pulls) to see all the new changes since the last release
 4. For Tag Version we use [Semantic Versioning](https://semver.org/)
 5. For the main release body, please include merged PRs that will be part of this release, ideally linking to the PR itself.
-6. Press buttan, receive release. The [tag github actions workflow](https://github.com/cloudigrade/houndigrade/blob/master/.github/workflows/tag.yml) will test, build, tag, and get the image copied to quay.
+6. Press button, receive release. The [tag github actions workflow](https://github.com/cloudigrade/houndigrade/blob/master/.github/workflows/tag.yml) will test, build, tag, and get the image copied to quay.
 
 You will find your image in both the [Github Container Registry](https://github.com/orgs/cloudigrade/packages/container/package/houndigrade) and in [Quay.io](https://quay.io/repository/cloudservices/houndigrade)
