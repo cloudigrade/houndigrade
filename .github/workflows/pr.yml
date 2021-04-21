@@ -1,8 +1,8 @@
 name: PR
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/houndigrade
-  IMAGE_NAME_COMMIT: ghcr.io/${{ github.repository_owner }}/houndigrade:${{ github.sha }}
+  IMAGE_NAME: quay.io/cloudservices/houndigrade
+  IMAGE_NAME_COMMIT: quay.io/cloudservices/houndigrade:${{ github.sha }}
 
 on: [pull_request]
 
