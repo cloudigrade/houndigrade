@@ -6,12 +6,12 @@ authors = ["Cloudigrade Dev Team <doppler-dev@redhat.com>"]
 license = "GPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 click = "*"
 "boto3" = "*"
 jsonpickle = "*"
-raven = "*"
 sh = "^1.13.1"
+sentry-sdk = "*"
 
 [tool.poetry.dev-dependencies]
 nose = "*"

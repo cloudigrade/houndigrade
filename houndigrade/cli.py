@@ -14,7 +14,7 @@ import click
 import jsonpickle
 import sh
 from botocore.exceptions import ClientError
-from raven import Client
+from sentry_sdk import init
 
 INSPECT_PATH = "/mnt/inspect"
 RHEL_FOUND = "rhel_found"
@@ -821,14 +821,10 @@ def check_enabled_repos(partition, results):
 
 if __name__ == "__main__":
     if os.getenv("HOUNDIGRADE_SENTRY_DSN", False):
-        raven = Client(
+        init(
             dsn=os.getenv("HOUNDIGRADE_SENTRY_DSN"),
             environment=os.getenv("HOUNDIGRADE_SENTRY_ENVIRONMENT"),
             release=os.getenv("HOUNDIGRADE_SENTRY_RELEASE"),
         )
-        try:
-            main()
-        except Exception:
-            raven.captureException()
     else:
         main()
