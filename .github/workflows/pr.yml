@@ -7,33 +7,23 @@ env:
 on: [pull_request]
 
 jobs:
-  test-py38:
-    name: py38
+  test-py39:
+    name: py39
     runs-on: ubuntu-latest
     container:
-      image: python:3.8
+      image: python:3.9
     steps:
       - uses: actions/checkout@v2
       - run: pip install tox codecov poetry
-      - run: tox -e py38
+      - run: tox -e py39
       - run: codecov
 
   test-flake8:
     name: flake8
     runs-on: ubuntu-latest
     container:
-      image: python:3.8
+      image: python:3.9
     steps:
       - uses: actions/checkout@v2
       - run: pip install tox poetry
       - run: tox -e flake8
-
-  test-docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    container:
-      image: docker:latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: docker pull $IMAGE_NAME:latest || true
-      - run: docker build --cache-from $IMAGE_NAME:latest .
