@@ -1,3 +1,4 @@
+# Builder Stage
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4 as builder
 
 ENV LANG=en_US.utf8
@@ -20,11 +21,11 @@ RUN microdnf update \
     && if [[ ! -e /usr/bin/python ]]; then ln -sf /usr/bin/python3.9 /usr/bin/python; fi \
     && if [ ! -e /usr/bin/pip ]; then ln -s /usr/bin/pip3.9 /usr/bin/pip ; fi \
     && pip install -U pip \
-    && pip install poetry \
+    && pip install poetry tox \
     && poetry config virtualenvs.in-project true \
     && poetry install -n --no-dev
 
-
+# Release Stage
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4 as release
 
 ENV LANG=en_US.utf8
@@ -47,3 +48,14 @@ COPY houndigrade/cli.py .
 
 ENTRYPOINT ["python", "cli.py"]
 CMD ["--help"]
+
+# PR Check Stage
+FROM builder as pr_check
+
+COPY tox.ini .
+COPY houndigrade/ houndigrade/
+
+RUN tox
+
+# Decalre "default" stage.
+FROM release
