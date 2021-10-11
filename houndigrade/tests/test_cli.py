@@ -1029,9 +1029,10 @@ class TestCLI(TestCase):
 PTUUID=98a48d3a
 PTTYPE=dos
 """
-        mock_udevadm.return_value = """ID_FS_TYPE=LVM2_member
-ID_FS_VERSION=LVM2 001
-"""
+        mock_udevadm_output1 = """ID_FS_VERSION=LVM2 001\n"""
+        mock_udevadm_output2 = """ID_FS_TYPE=LVM2_member\n"""
+
+        mock_udevadm.side_effect = [mock_udevadm_output1, mock_udevadm_output2]
         lv_path = "./dev/mapper/rhel_vg-rhel_lv"
         mock_tail.return_value = [lv_path]
         mock_subprocess_check_output.return_value = RPM_RESULT_NONE
