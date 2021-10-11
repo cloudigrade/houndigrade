@@ -587,9 +587,9 @@ def is_lvm(partitions):
         partition_info[partition] = properties
 
     for partition, properties in partition_info.items():
-        if properties.get("ID_FS_TYPE") == "LVM2_member":
+        if properties.get("ID_FS_TYPE", "") == "LVM2_member":
             lvm_partitions.add(partition)
-        if "LVM2" in properties.get("ID_FS_VERSION"):
+        if "LVM2" in properties.get("ID_FS_VERSION", ""):
             lvm_partitions.add(partition)
 
     return lvm_partitions
