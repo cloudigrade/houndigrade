@@ -33,7 +33,7 @@ fi
 docker --config="${DOCKER_CONF}" pull ${IMAGE_NAME}:latest || true
 
 # Build and Tag
-docker --config="${DOCKER_CONF}" build --cache-from ${IMAGE_NAME}:latest --tag "${IMAGE_NAME}:latest" .
+docker --config="${DOCKER_CONF}" build --cache-from ${IMAGE_NAME}:latest --target release --tag "${IMAGE_NAME}:latest" .
 if [[ "$push_git_tag" = true ]]; then
     docker --config="${DOCKER_CONF}" tag "${IMAGE_NAME}:latest" "${IMAGE_NAME}:${GIT_TAG}"
 fi
