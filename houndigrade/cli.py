@@ -311,7 +311,7 @@ def mount(partition, inspect_path):
         "-t",
         "auto",
         "-o",
-        "ro,noload",
+        "ro",
         "{}".format(partition),
         "{}".format(inspect_path),
     )
