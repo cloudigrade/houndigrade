@@ -14,9 +14,11 @@ do
     echo "####################################"
     echo "# Inspection for disk file: ${DISK}"
     DISK_NAME=$(echo "${DISK}" | grep -o '[^/]*$')
+    vgchange -an
     losetup -D
     losetup -P /dev/loop10 "${DISK}"
     python cli.py -t "ami-${DISK_NAME}" /dev/loop10
+    vgchange -an
     losetup -D
 done
 
