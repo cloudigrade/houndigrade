@@ -22,7 +22,7 @@ docker --config="${DOCKER_CONF}" login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay
 docker --config="${DOCKER_CONF}" login -u="$RH_REGISTRY_USER" -p="$RH_REGISTRY_TOKEN" registry.redhat.io
 
 # Check if semver tagged image already exists, or this is the first build of it.
-if [[ ! `docker --config="${DOCKER_CONF}" pull ${IMAGE_NAME}:${GIT_TAG}` ]]; then
+if [[ ! $(docker --config="${DOCKER_CONF}" pull ${IMAGE_NAME}:${GIT_TAG}) ]]; then
     echo "First time encountering ${GIT_TAG}, building..."
     push_git_tag=true
 else
