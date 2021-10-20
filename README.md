@@ -57,23 +57,11 @@ Finally, if you need to install a dev only dependency, use:
 
 ### Running
 
-Before running, you must have set and exported the following environment variables so houndigrade can talk to Amazon SQS to share its results:
+Before running, you must have set and exported the following environment variables so houndigrade can talk to Amazon S3 to share its results:
 
-    - `QUEUE_CONNECTION_URL`
-    - `AWS_SQS_QUEUE_NAME_PREFIX`
+    - `RESULTS_BUCKET_NAME`
 
-`AWS_SQS_QUEUE_NAME_PREFIX` should match what you use when running cloudigrade, and that is probably `${USER}-`.
-
-`QUEUE_CONNECTION_URL` must be a well-formed SQS URL that includes your Amazon SQS access key and secret key. Many Amazon keys have URL-unfriendly characters. You may want to use a small helper script like this to generate a valid URL:
-
-```python
-from os import environ
-from urllib.parse import quote
-print('sqs://{}:{}@'.format(
-    quote(environ['AWS_SQS_ACCESS_KEY_ID'], safe=''),
-    quote(environ['AWS_SQS_SECRET_ACCESS_KEY'], safe='')
-))
-```
+`RESULTS_BUCKET_NAME` should match the bucket name in which you want your results, the rest of the credentials are gathered from the environment.
 
 To run houndigrade locally against minimal test disk images, follow these steps:
 
@@ -131,34 +119,19 @@ If you wish to run a higher-level suite of integration tests, see
 
 ### Manually running in AWS
 
-If you want to manually run houndigrade in AWS so that you can watch its output in real-time, you can *simulate* how the cloudigrade ECS task runs houndigrade by SSH-ing to an EC2 instance (running an ECS AMI) and running Docker with the arguments that would be used in the ECS task definition. For example:
+If you want to manually run houndigrade in AWS so that you can watch its output in real-time, you can *simulate* how the cloudigrade CloudInit task runs houndigrade by SSH-ing to an EC2 instance (running an ECS AMI) and running Docker with the arguments that would be used in the CloudInit task definition. For example:
 
     docker run \
         --mount type=bind,source=/dev,target=/dev \
         --privileged --rm -i -t \
-        -e AWS_ACCESS_KEY_ID=AWS_SQS_ACCESS_KEY_ID \
-        -e AWS_DEFAULT_REGION="us-east-1" \
-        -e AWS_SECRET_ACCESS_KEY="AWS_SQS_SECRET_ACCESS_KEY" \
-        -e EXCHANGE_NAME="" \
-        -e QUEUE_CONNECTION_URL="sqs://AWS_SQS_ACCESS_KEY_ID:AWS_SQS_SECRET_ACCESS_KEY@" \
-        -e RESULTS_QUEUE_NAME="HOUNDIGRADE_RESULTS_QUEUE_NAME" \
+        -e RESULTS_BUCKET_NAME=RESULTS_BUCKET_NAME \
         --name houndi \
         "registry.gitlab.com/cloudigrade/houndigrade:latest" \
         -c aws \
-        -t ami-13469000000000000 /dev/sdf \
-        -t ami-12345678900000000 /dev/sdg
+        -t ami-13469000000000000 /dev/sdf
 
 You will need to set appropriate values for the `-e` variables passed into the environment, each of the `-t` arguments that define the inspection targets, and the specific version of the houndigrade image you wish to use. When you attach volumes in AWS, you can define the device paths they'll use, and they should match your target arguments here. Alternatively, you can describe the running EC2 instance to get the device paths.
 
 # Releasing Houndigrade
 
-Releasing houndigrade is a simple process of tagging a new version in GitHub. 
-
-1. Navigate to the [releases page](https://github.com/cloudigrade/houndigrade/releases)
-2. Draft a new release
-3. Check the [Pull Requests page](https://github.com/cloudigrade/houndigrade/pulls) to see all the new changes since the last release
-4. For Tag Version we use [Semantic Versioning](https://semver.org/)
-5. For the main release body, please include merged PRs that will be part of this release, ideally linking to the PR itself.
-6. Press button, receive release. The [tag github actions workflow](https://github.com/cloudigrade/houndigrade/blob/master/.github/workflows/tag.yml) will test, build, tag, and get the image copied to quay.
-
-You will find your image in both the [Github Container Registry](https://github.com/orgs/cloudigrade/packages/container/package/houndigrade) and in [Quay.io](https://quay.io/repository/cloudservices/houndigrade)
+Please refer to the [wiki](https://github.com/cloudigrade/houndigrade/wiki/Releasing-Houndigrade).
