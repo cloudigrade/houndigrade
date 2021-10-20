@@ -6,14 +6,17 @@ import json
 import os
 import subprocess
 import sys
+from base64 import b64encode
 from contextlib import contextmanager
+from datetime import datetime
 from gettext import gettext as _
+from hashlib import md5
+from uuid import uuid4
 
 import boto3
 import click
 import jsonpickle
 import sh
-from botocore.exceptions import ClientError
 from sentry_sdk import init
 
 INSPECT_PATH = "/mnt/inspect"
@@ -322,46 +325,42 @@ def mount(partition, inspect_path):
     click.echo(_("UnMounting result {}.").format(unmount_result.exit_code))
 
 
-def _get_sqs_queue_url(queue_name):
+def generate_results_key():
     """
-    Get the SQS queue URL for the given queue name.
-
-    This has the side-effect on ensuring that the queue exists.
-
-    Note: This function was copied verbatim from `cloudigrade`.
-
-    FIXME: Move this function to a shared library.
-
-    Args:
-        queue_name (str): the name of the target SQS queue
+    Generate the key at which the results object will be placed.
 
     Returns:
-        str: the queue's URL.
+        (str): String representation of the object key.
 
     """
-    sqs = boto3.client("sqs")
-    try:
-        return sqs.get_queue_url(QueueName=queue_name)["QueueUrl"]
-    except ClientError as e:
-        if e.response["Error"]["Code"].endswith(".NonExistentQueue"):
-            return sqs.create_queue(QueueName=queue_name)["QueueUrl"]
-        raise
+    now = datetime.now()
+    time_path = now.strftime("%Y-%m/%d/%H.%M.%S")
+
+    return f"InspectionResults/{time_path}-{uuid4()}.json"
 
 
 def report_results(results):
     """
-    Places the results on a queue.
+    Places results in the bucket.
 
     Args:
-        results (dict): The results of the finished inspection.
+        results (s3.Object): Object representing the results stored in our S3 bucket.
 
     """
-    message_body = jsonpickle.encode(results)
-    queue_name = os.getenv("RESULTS_QUEUE_NAME")
-    queue_url = _get_sqs_queue_url(queue_name)
+    json_results = jsonpickle.encode(results)
+    encoded_results = json_results.encode()
+    results_md5 = b64encode(md5(encoded_results).digest()).decode()
 
-    sqs = boto3.client("sqs")
-    sqs.send_message(QueueUrl=queue_url, MessageBody=message_body)
+    bucket_name = os.getenv("RESULTS_BUCKET_NAME")
+
+    s3 = boto3.resource("s3")
+    bucket = s3.Bucket(bucket_name)
+
+    results = bucket.put_object(
+        Body=encoded_results, ContentMD5=results_md5, Key=generate_results_key()
+    )
+
+    return results
 
 
 def check_for_rhel_certs(partition, results):
