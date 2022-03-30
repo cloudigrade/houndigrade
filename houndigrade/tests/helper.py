@@ -87,6 +87,22 @@ def prepare_fs_empty(root_path):
     pathlib.Path(root_path).mkdir(parents=True, exist_ok=True)
 
 
+def prepare_fs_ostree_rhel_release(root_path):
+    """Prepare an ostree deployment fs directory with RHEL release files."""
+    boot_path = f"{root_path}/ostree/boot.1.1/rhcos/3735928559/"
+    deployment_path = f"{root_path}/ostree/deploy/rhcos/deploy/3133.7"
+    symlink_path = "../../../deploy/rhcos/deploy/3133.7"
+    symlink_dst = f"{boot_path}/0"
+    etc_path = f"{deployment_path}/etc"
+
+    pathlib.Path(os.path.dirname(boot_path)).mkdir(parents=True, exist_ok=True)
+    os.symlink(symlink_path, symlink_dst)
+    os.symlink("./boot.1.1", f"{root_path}/ostree/boot.1")
+
+    write_data(data.OS_RELEASE_REDHAT, f"{etc_path}/os-release")
+    write_data(data.REDHAT_RELEASE, f"{etc_path}/redhat-release")
+
+
 def prepare_fs_rhel_release(root_path):
     """Prepare a filesystem directory with RHEL release files."""
     etc_path = f"{root_path}/etc"

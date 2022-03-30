@@ -299,6 +299,21 @@ def check_partition(drive, partition, image_id, results):
         results["errors"].append(message)
 
 
+def check_for_ostree():
+    """
+    Check for presence of an ostree deployment on mounted partition.
+
+    Returns:
+        (os.path): path to the root of the ostree deployment.
+
+    """
+    ostree_root = os.path.join(INSPECT_PATH, "ostree")
+    # Get default boot target, which will always either be boot.0 or boot.1
+    path_pattern = os.path.join(ostree_root, "boot.[0,1]/**/**/**/")
+    if boot_path := glob.glob(path_pattern):
+        return os.path.realpath(boot_path[0])
+
+
 @contextmanager
 def mount(partition, inspect_path):
     """
@@ -309,6 +324,8 @@ def mount(partition, inspect_path):
         inspect_path (str): The path where the partition should be mounted.
 
     """
+    global INSPECT_PATH
+    default_inspect_path = INSPECT_PATH
     click.echo(_("Mounting {}.").format(partition))
     mount_result = sh.mount(
         "-t",
@@ -319,8 +336,25 @@ def mount(partition, inspect_path):
         "{}".format(inspect_path),
     )
     click.echo(_("Mounting result {}.").format(mount_result.exit_code))
+    if ostree_path := check_for_ostree():
+        # Set INSPECT_PATH to the ostree deployment root
+        click.echo(
+            _(
+                "Found ostree deployment, updating INSPECT_PATH "
+                "to {ostree_path} for {partition}."
+            ).format(ostree_path=ostree_path, partition=partition)
+        )
+        INSPECT_PATH = ostree_path
     yield mount_result
     click.echo(_("UnMounting {}.").format(partition))
+    if ostree_path:
+        # Restore INSPECT_PATH if we set it earlier.
+        INSPECT_PATH = default_inspect_path
+        click.echo(
+            _("Restored INSPECT_PATH to {inspect_path}.").format(
+                inspect_path=INSPECT_PATH
+            )
+        )
     unmount_result = sh.umount("{}".format(inspect_path))
     click.echo(_("UnMounting result {}.").format(unmount_result.exit_code))
 
