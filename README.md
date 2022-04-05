@@ -100,6 +100,17 @@ To run houndigrade locally against minimal test disk images, follow these steps:
     git submodule update --init --recursive --force
     ```
 
+If you've made changes to houndigrade test-data and would like to update the submodule reference, follow these steps:
+
+    cd test-data/
+    git checkout master
+    git pull origin master
+    cd ..
+    git add test-data/
+
+From that point on you can continue making your commit as usual.
+
+
 ### Testing
 
 To run all local tests as well as our code-quality checking commands:
