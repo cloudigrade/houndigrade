@@ -11,7 +11,7 @@ jobs:
     name: py39
     runs-on: ubuntu-latest
     container:
-      image: python:3.9
+      image: python:3.10
     steps:
       - uses: actions/checkout@v3
       - run: pip install tox codecov poetry
@@ -22,7 +22,7 @@ jobs:
     name: flake8
     runs-on: ubuntu-latest
     container:
-      image: python:3.9
+      image: python:3.10
     steps:
       - uses: actions/checkout@v3
       - run: pip install tox poetry
