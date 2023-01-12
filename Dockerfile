@@ -1,5 +1,5 @@
 # Builder Stage
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-923 as builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1049 as builder
 
 ENV LANG=en_US.utf8
 
@@ -26,7 +26,7 @@ RUN microdnf update \
     && poetry install -n --no-dev
 
 # Release Stage
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-923 as release
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1049 as release
 
 ENV LANG=en_US.utf8
 ENV VIRTUAL_ENV=/opt/houndigrade/.venv
